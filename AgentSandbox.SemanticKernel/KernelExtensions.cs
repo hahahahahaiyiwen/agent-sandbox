@@ -48,16 +48,15 @@ public static class KernelExtensions
             throw new InvalidOperationException("Sandbox service is not registered. Please call AddSandboxManager() when configuring the kernel.");
         }
 
-        return CreateSandboxFunction(kernel.Services.GetRequiredService<Sandbox>(), options).AsKernelFunction();
+        return CreateSandboxFunction(sandbox).AsKernelFunction();
     }
 
     /// <summary>
     /// Creates a AIFunction for sandbox command execution with dynamic description.
     /// </summary>
     /// <param name="sandbox">The sandbox instance.</param>
-    /// <param name="options">Optional sandbox options for description generation.</param>
     /// <returns>An AIFunction that executes commands in the sandbox.</returns>
-    public static AIFunction CreateSandboxFunction(Sandbox sandbox, SandboxOptions? options = null)
+    public static AIFunction CreateSandboxFunction(Sandbox sandbox)
     {
         return AIFunctionFactory.Create(
             (string command) =>
@@ -72,7 +71,7 @@ public static class KernelExtensions
                 return $"Error: {result.Stderr}";
             },
             name: "Execute",
-            description: BuildSandboxFunctionDescription(options));
+            description: BuildSandboxFunctionDescription(sandbox.Options));
     }
 
     private static string BuildSandboxFunctionDescription(SandboxOptions? options)

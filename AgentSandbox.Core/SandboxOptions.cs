@@ -26,4 +26,18 @@ public class SandboxOptions
     public string WorkingDirectory { get; set; } = "/";
 
     public IEnumerable<IShellCommand> ShellExtensions { get; set; } = Array.Empty<IShellCommand>();
+
+    /// <summary>
+    /// Creates a shallow copy of this options instance.
+    /// </summary>
+    public SandboxOptions Clone() => new()
+    {
+        MaxTotalSize = MaxTotalSize,
+        MaxFileSize = MaxFileSize,
+        MaxNodeCount = MaxNodeCount,
+        CommandTimeout = CommandTimeout,
+        Environment = new Dictionary<string, string>(Environment),
+        WorkingDirectory = WorkingDirectory,
+        ShellExtensions = ShellExtensions.ToArray()
+    };
 }

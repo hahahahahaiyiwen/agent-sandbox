@@ -8,52 +8,62 @@ namespace AgentSandbox.Core;
 /// </summary>
 public class Sandbox : IDisposable
 {
-    public string Id { get; }
-    public FileSystem.FileSystem FileSystem { get; }
-    public SandboxShell Shell { get; }
-    public SandboxOptions Options { get; }
-    public DateTime CreatedAt { get; }
-    public DateTime LastActivityAt { get; private set; }
-    
+    private readonly FileSystem.FileSystem _fileSystem;
+    private readonly SandboxShell _shell;
+    private readonly SandboxOptions _options;
     private readonly List<ShellResult> _commandHistory = new();
     private readonly Action<string>? _onDisposed;
     private bool _disposed;
 
+    public string Id { get; }
+    public DateTime CreatedAt { get; }
+    public DateTime LastActivityAt { get; private set; }
+    
+    /// <summary>
+    /// Gets the current working directory of the sandbox shell.
+    /// </summary>
+    public string CurrentDirectory => _shell.CurrentDirectory;
+    
+    /// <summary>
+    /// Gets a copy of the sandbox options. Modifications to the returned object do not affect the sandbox.
+    /// </summary>
+    public SandboxOptions Options => _options.Clone();
+
     public Sandbox(string? id = null, SandboxOptions? options = null, Action<string>? onDisposed = null)
     {
         Id = id ?? Guid.NewGuid().ToString("N")[..12];
-        Options = options ?? new SandboxOptions();
+        _options = options ?? new SandboxOptions();
         _onDisposed = onDisposed;
         
         // Create filesystem with size limits from options
         var fsOptions = new FileSystemOptions
         {
-            MaxTotalSize = Options.MaxTotalSize,
-            MaxFileSize = Options.MaxFileSize,
-            MaxNodeCount = Options.MaxNodeCount
+            MaxTotalSize = _options.MaxTotalSize,
+            MaxFileSize = _options.MaxFileSize,
+            MaxNodeCount = _options.MaxNodeCount
         };
-        FileSystem = new FileSystem.FileSystem(fsOptions);
-        Shell = new SandboxShell(FileSystem);
+        _fileSystem = new FileSystem.FileSystem(fsOptions);
+        _shell = new SandboxShell(_fileSystem);
         CreatedAt = DateTime.UtcNow;
         LastActivityAt = CreatedAt;
 
         // Apply initial environment
-        foreach (var kvp in Options.Environment)
+        foreach (var kvp in _options.Environment)
         {
-            Shell.Execute($"export {kvp.Key}={kvp.Value}");
+            _shell.Execute($"export {kvp.Key}={kvp.Value}");
         }
 
         // Set initial working directory
-        if (Options.WorkingDirectory != "/")
+        if (_options.WorkingDirectory != "/")
         {
-            FileSystem.CreateDirectory(Options.WorkingDirectory);
-            Shell.Execute($"cd {Options.WorkingDirectory}");
+            _fileSystem.CreateDirectory(_options.WorkingDirectory);
+            _shell.Execute($"cd {_options.WorkingDirectory}");
         }
 
         // Register shell extensions
-        foreach (var cmd in Options.ShellExtensions)
+        foreach (var cmd in _options.ShellExtensions)
         {
-            Shell.RegisterCommand(cmd);
+            _shell.RegisterCommand(cmd);
         }
     }
 
@@ -65,7 +75,7 @@ public class Sandbox : IDisposable
         ThrowIfDisposed();
         LastActivityAt = DateTime.UtcNow;
         
-        var result = Shell.Execute(command);
+        var result = _shell.Execute(command);
         _commandHistory.Add(result);
         
         return result;
@@ -85,9 +95,9 @@ public class Sandbox : IDisposable
         return new SandboxSnapshot
         {
             Id = Id,
-            FileSystemData = FileSystem.CreateSnapshot(),
-            CurrentDirectory = Shell.CurrentDirectory,
-            Environment = new Dictionary<string, string>(Shell.Environment),
+            FileSystemData = _fileSystem.CreateSnapshot(),
+            CurrentDirectory = _shell.CurrentDirectory,
+            Environment = new Dictionary<string, string>(_shell.Environment),
             CreatedAt = DateTime.UtcNow
         };
     }
@@ -98,12 +108,12 @@ public class Sandbox : IDisposable
     public void RestoreSnapshot(SandboxSnapshot snapshot)
     {
         ThrowIfDisposed();
-        FileSystem.RestoreSnapshot(snapshot.FileSystemData);
-        Shell.Execute($"cd {snapshot.CurrentDirectory}");
+        _fileSystem.RestoreSnapshot(snapshot.FileSystemData);
+        _shell.Execute($"cd {snapshot.CurrentDirectory}");
         
         foreach (var kvp in snapshot.Environment)
         {
-            Shell.Execute($"export {kvp.Key}={kvp.Value}");
+            _shell.Execute($"export {kvp.Key}={kvp.Value}");
         }
         
         LastActivityAt = DateTime.UtcNow;
@@ -115,10 +125,10 @@ public class Sandbox : IDisposable
     public SandboxStats GetStats() => new()
     {
         Id = Id,
-        FileCount = FileSystem.NodeCount,
-        TotalSize = FileSystem.TotalSize, // in bytes
+        FileCount = _fileSystem.NodeCount,
+        TotalSize = _fileSystem.TotalSize, // in bytes
         CommandCount = _commandHistory.Count,
-        CurrentDirectory = Shell.CurrentDirectory,
+        CurrentDirectory = _shell.CurrentDirectory,
         CreatedAt = CreatedAt,
         LastActivityAt = LastActivityAt
     };
