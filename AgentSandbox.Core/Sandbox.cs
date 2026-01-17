@@ -1,5 +1,7 @@
+using System.Text;
 using AgentSandbox.Core.FileSystem;
 using AgentSandbox.Core.Shell;
+using AgentSandbox.Core.Skills;
 
 namespace AgentSandbox.Core;
 
@@ -12,6 +14,7 @@ public class Sandbox : IDisposable
     private readonly SandboxShell _shell;
     private readonly SandboxOptions _options;
     private readonly List<ShellResult> _commandHistory = new();
+    private readonly List<SkillInfo> _mountedSkills = new();
     private readonly Action<string>? _onDisposed;
     private bool _disposed;
 
@@ -65,6 +68,75 @@ public class Sandbox : IDisposable
         {
             _shell.RegisterCommand(cmd);
         }
+
+        // Mount agent skills
+        MountSkills();
+    }
+
+    /// <summary>
+    /// Gets information about all mounted skills.
+    /// </summary>
+    public IReadOnlyList<SkillInfo> GetMountedSkills() => _mountedSkills.AsReadOnly();
+    
+    private void MountSkills()
+    {
+        if (_options.Skills.Count == 0) return;
+
+        // Create skills base directory
+        _fileSystem.CreateDirectory(_options.SkillsMountPath);
+
+        foreach (var skill in _options.Skills)
+        {
+            var skillInfo = MountSkill(skill);
+            _mountedSkills.Add(skillInfo);
+        }
+    }
+
+    private SkillInfo MountSkill(AgentSkill skill)
+    {
+        // Get all files from the skill source
+        var files = skill.Source.GetFiles().ToList();
+
+        // Find and parse SKILL.md (required)
+        var skillMdFile = files.FirstOrDefault(f => 
+            f.RelativePath.Equals("SKILL.md", StringComparison.OrdinalIgnoreCase));
+        
+        if (skillMdFile == null)
+        {
+            throw new InvalidSkillException("Skill must contain a SKILL.md file");
+        }
+
+        var metadata = SkillMetadata.Parse(skillMdFile.GetContentAsString());
+
+        // Use name from AgentSkill if provided, otherwise from SKILL.md
+        var skillName = skill.Name ?? metadata.Name;
+        var mountPath = $"{_options.SkillsMountPath}/{skillName}";
+
+        // Create mount directory
+        _fileSystem.CreateDirectory(mountPath);
+
+        // Copy all files to virtual filesystem
+        foreach (var file in files)
+        {
+            var destPath = $"{mountPath}/{file.RelativePath}";
+            
+            // Ensure parent directory exists
+            var parentDir = destPath[..destPath.LastIndexOf('/')];
+            if (parentDir != mountPath && !_fileSystem.Exists(parentDir))
+            {
+                _fileSystem.CreateDirectory(parentDir);
+            }
+
+            _fileSystem.WriteFile(destPath, file.Content);
+        }
+
+        return new SkillInfo
+        {
+            Name = skillName,
+            Description = metadata.Description,
+            MountPath = mountPath,
+            Metadata = metadata
+        };
     }
 
     /// <summary>

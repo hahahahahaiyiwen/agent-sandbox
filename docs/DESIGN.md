@@ -223,3 +223,4 @@ AgentSandbox/
 - [SANDBOX_DESIGN.md](./SANDBOX_DESIGN.md) - Internal design of Sandbox Instance, Shell, and Shell Extensions
 - [FILESYSTEM_DESIGN.md](./FILESYSTEM_DESIGN.md) - FileSystem interfaces and storage abstraction
 - [SHELL_EXTENSIONS.md](./SHELL_EXTENSIONS.md) - Shell extension architecture, built-in commands, and roadmap
+- [AGENT_SKILLS.md](./AGENT_SKILLS.md) - Agent Skills integration for structured skill packages

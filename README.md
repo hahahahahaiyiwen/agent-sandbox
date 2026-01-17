@@ -203,7 +203,23 @@ curl "http://localhost:5000/api/sandbox/agent-1/ls?path=/workspace"
 | `find` | Find files | `find /path -name "*.txt"` |
 | `env` | Show environment | `env` |
 | `export` | Set environment variable | `export KEY=value` |
+| `sh` | Execute shell script | `sh script.sh arg1 arg2` |
 | `help` | Show available commands | `help` |
+
+**Shell Script Execution:**
+
+The `sh` command executes shell scripts with support for:
+- Positional parameters: `$1`, `$2`, ... `$9`
+- All arguments: `$@`, `$*`
+- Argument count: `$#`
+- Comments and shebang lines are skipped
+- Stops on first error (set -e behavior)
+
+```bash
+# Direct execution also works for .sh files
+./script.sh arg1 arg2
+/path/to/script.sh
+```
 
 ### Shell Extensions
 

@@ -1,4 +1,5 @@
 using AgentSandbox.Core.Shell;
+using AgentSandbox.Core.Skills;
 
 namespace AgentSandbox.Core;
 
@@ -25,7 +26,19 @@ public class SandboxOptions
     /// <summary>Initial working directory.</summary>
     public string WorkingDirectory { get; set; } = "/";
 
+    /// <summary>Shell command extensions to register.</summary>
     public IEnumerable<IShellCommand> ShellExtensions { get; set; } = Array.Empty<IShellCommand>();
+
+    /// <summary>
+    /// Agent skills to mount into the sandbox filesystem.
+    /// Skills are copied to /.sandbox/skills/{name}/ at initialization.
+    /// </summary>
+    public IReadOnlyList<AgentSkill> Skills { get; set; } = [];
+
+    /// <summary>
+    /// Base path where skills are mounted. Default: /.sandbox/skills
+    /// </summary>
+    public string SkillsMountPath { get; set; } = "/.sandbox/skills";
 
     /// <summary>
     /// Creates a shallow copy of this options instance.
@@ -38,6 +51,8 @@ public class SandboxOptions
         CommandTimeout = CommandTimeout,
         Environment = new Dictionary<string, string>(Environment),
         WorkingDirectory = WorkingDirectory,
-        ShellExtensions = ShellExtensions.ToArray()
+        ShellExtensions = ShellExtensions.ToArray(),
+        Skills = Skills.ToArray(),
+        SkillsMountPath = SkillsMountPath
     };
 }

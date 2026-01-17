@@ -11,4 +11,10 @@
     <ProjectReference Include="..\AgentSandbox.SemanticKernel\AgentSandbox.SemanticKernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Skills\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

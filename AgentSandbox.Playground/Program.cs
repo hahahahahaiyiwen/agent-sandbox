@@ -1,6 +1,25 @@
 ﻿using AgentSandbox.Core;
+using AgentSandbox.Core.Shell;
+using AgentSandbox.Core.Shell.Extensions;
+using AgentSandbox.Core.Skills;
 
-Sandbox sandbox = new Sandbox();
+// Get the skills folder path relative to the executable
+var skillsPath = Path.Combine(AppContext.BaseDirectory, "Skills");
+
+Sandbox sandbox = new Sandbox(options: new SandboxOptions
+{
+    ShellExtensions = new List<IShellCommand>
+    {
+        new CurlCommand(),
+        new JqCommand(),
+        new GitCommand()
+    },
+    Skills = 
+    [
+        AgentSkill.FromPath(Path.Combine(skillsPath, "brainstorming")),
+        AgentSkill.FromPath(Path.Combine(skillsPath, "executing-plans"))
+    ]
+});
 
 while (true)
 {

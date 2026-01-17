@@ -59,6 +59,7 @@ public class SandboxShell : ISandboxShell, IShellContext
             ["export"] = CmdExport,
             ["clear"] = _ => ShellResult.Ok(),
             ["help"] = CmdHelp,
+            ["sh"] = CmdSh,
         };
     }
 
@@ -149,13 +150,27 @@ public class SandboxShell : ISandboxShell, IShellContext
         if (parts.Length == 0)
             return ShellResult.Ok();
 
-        var cmd = parts[0].ToLowerInvariant();
+        var cmd = parts[0];
+        var cmdLower = cmd.ToLowerInvariant();
         var args = parts.Skip(1).ToArray();
 
         ShellResult result;
         
+        // Check if it's a direct script execution (./script.sh or /path/to/script.sh)
+        if ((cmd.StartsWith("./") || cmd.StartsWith("/")) && cmd.EndsWith(".sh"))
+        {
+            try
+            {
+                // Execute as shell script
+                result = CmdSh(new[] { cmd }.Concat(args).ToArray());
+            }
+            catch (Exception ex)
+            {
+                result = ShellResult.Error($"{cmd}: {ex.Message}");
+            }
+        }
         // Check built-in commands first
-        if (_builtinCommands.TryGetValue(cmd, out var handler))
+        else if (_builtinCommands.TryGetValue(cmdLower, out var handler))
         {
             try
             {
@@ -163,11 +178,11 @@ public class SandboxShell : ISandboxShell, IShellContext
             }
             catch (Exception ex)
             {
-                result = ShellResult.Error($"{cmd}: {ex.Message}");
+                result = ShellResult.Error($"{cmdLower}: {ex.Message}");
             }
         }
         // Then check extension commands
-        else if (_extensionCommands.TryGetValue(cmd, out var extCommand))
+        else if (_extensionCommands.TryGetValue(cmdLower, out var extCommand))
         {
             try
             {
@@ -175,12 +190,12 @@ public class SandboxShell : ISandboxShell, IShellContext
             }
             catch (Exception ex)
             {
-                result = ShellResult.Error($"{cmd}: {ex.Message}");
+                result = ShellResult.Error($"{cmdLower}: {ex.Message}");
             }
         }
         else
         {
-            result = ShellResult.Error($"{cmd}: command not found", 127);
+            result = ShellResult.Error($"{cmdLower}: command not found", 127);
         }
 
         // Handle output redirection
@@ -297,6 +312,14 @@ public class SandboxShell : ISandboxShell, IShellContext
 
     private string ExpandVariables(string text)
     {
+        // First handle special parameters: $@, $*, $#, $0-$9
+        text = Regex.Replace(text, @"\$([0-9@#*])", m =>
+        {
+            var varName = m.Groups[1].Value;
+            return _environment.TryGetValue(varName, out var value) ? value : "";
+        });
+        
+        // Then handle named variables: $VAR, $HOME, etc.
         return Regex.Replace(text, @"\$(\w+)", m =>
         {
             var varName = m.Groups[1].Value;
@@ -750,6 +773,103 @@ public class SandboxShell : ISandboxShell, IShellContext
         return ShellResult.Ok();
     }
 
+    private ShellResult CmdSh(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return ShellResult.Error("sh: missing script path\nUsage: sh <script.sh> [args...]");
+        }
+
+        var scriptPath = ResolvePath(args[0]);
+
+        if (!_fs.Exists(scriptPath) || !_fs.IsFile(scriptPath))
+        {
+            return ShellResult.Error($"sh: {args[0]}: No such file");
+        }
+
+        var scriptContent = _fs.ReadFile(scriptPath, Encoding.UTF8);
+        var scriptArgs = args.Skip(1).ToArray();
+
+        return ExecuteScript(scriptContent, scriptArgs);
+    }
+
+    /// <summary>
+    /// Executes a shell script with the given arguments.
+    /// </summary>
+    private ShellResult ExecuteScript(string script, string[] args)
+    {
+        // Save current environment state for positional parameters
+        var savedParams = new Dictionary<string, string?>();
+        var paramNames = new[] { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "@", "#", "*" };
+        foreach (var name in paramNames)
+        {
+            savedParams[name] = _environment.TryGetValue(name, out var val) ? val : null;
+        }
+
+        try
+        {
+            // Set positional parameters $1, $2, etc.
+            for (int i = 0; i < args.Length && i < 9; i++)
+            {
+                _environment[$"{i + 1}"] = args[i];
+            }
+            // Clear unused positional parameters
+            for (int i = args.Length; i < 9; i++)
+            {
+                _environment.Remove($"{i + 1}");
+            }
+            
+            _environment["@"] = string.Join(" ", args);
+            _environment["*"] = string.Join(" ", args);
+            _environment["#"] = args.Length.ToString();
+
+            var lines = script.Split('\n');
+            var output = new StringBuilder();
+
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+
+                // Skip empty lines and comments
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#'))
+                    continue;
+
+                var result = Execute(trimmed);
+
+                if (!string.IsNullOrEmpty(result.Stdout))
+                {
+                    if (output.Length > 0)
+                        output.AppendLine();
+                    output.Append(result.Stdout);
+                }
+
+                // Stop on error (set -e behavior)
+                if (result.ExitCode != 0)
+                {
+                    return new ShellResult
+                    {
+                        ExitCode = result.ExitCode,
+                        Stdout = output.ToString(),
+                        Stderr = result.Stderr
+                    };
+                }
+            }
+
+            return ShellResult.Ok(output.ToString());
+        }
+        finally
+        {
+            // Restore positional parameters
+            foreach (var (name, value) in savedParams)
+            {
+                if (value != null)
+                    _environment[name] = value;
+                else
+                    _environment.Remove(name);
+            }
+        }
+    }
+
     private ShellResult CmdHelp(string[] args)
     {
         var output = new StringBuilder();
@@ -771,6 +891,7 @@ public class SandboxShell : ISandboxShell, IShellContext
         output.AppendLine("  find [path]      Find files");
         output.AppendLine("  env              Show environment variables");
         output.AppendLine("  export VAR=val   Set environment variable");
+        output.AppendLine("  sh <script>      Execute shell script");
         output.AppendLine("  help             Show this help");
         return ShellResult.Ok(output.ToString().TrimEnd());
     }

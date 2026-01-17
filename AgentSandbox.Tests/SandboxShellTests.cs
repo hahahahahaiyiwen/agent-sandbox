@@ -234,10 +234,197 @@ public class SandboxShellTests
     public void Help_ListsAvailableCommands()
     {
         var result = _shell.Execute("help");
-        
+
         Assert.True(result.Success);
         Assert.Contains("pwd", result.Stdout);
         Assert.Contains("cd", result.Stdout);
         Assert.Contains("ls", result.Stdout);
+        Assert.Contains("sh", result.Stdout);
     }
+
+    #region sh Command Tests
+
+    [Fact]
+    public void Sh_ExecutesSimpleScript()
+    {
+        _fs.WriteFile("/script.sh", "echo Hello\necho World");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.True(result.Success);
+        Assert.Contains("Hello", result.Stdout);
+        Assert.Contains("World", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_SkipsComments()
+    {
+        _fs.WriteFile("/script.sh", "# This is a comment\necho Hello\n# Another comment");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.True(result.Success);
+        Assert.Equal("Hello", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_SkipsShebang()
+    {
+        _fs.WriteFile("/script.sh", "#!/bin/bash\necho Hello");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.True(result.Success);
+        Assert.Equal("Hello", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_SupportsPositionalParameters()
+    {
+        _fs.WriteFile("/script.sh", "echo $1 $2");
+        
+        var result = _shell.Execute("sh /script.sh foo bar");
+        
+        Assert.True(result.Success);
+        Assert.Equal("foo bar", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_SupportsAllArgsParameter()
+    {
+        _fs.WriteFile("/script.sh", "echo $@");
+        
+        var result = _shell.Execute("sh /script.sh one two three");
+        
+        Assert.True(result.Success);
+        Assert.Equal("one two three", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_SupportsArgCountParameter()
+    {
+        _fs.WriteFile("/script.sh", "echo $#");
+        
+        var result = _shell.Execute("sh /script.sh a b c");
+        
+        Assert.True(result.Success);
+        Assert.Equal("3", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_StopsOnError()
+    {
+        _fs.WriteFile("/script.sh", "echo First\ncat /nonexistent\necho Second");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.False(result.Success);
+        Assert.Contains("First", result.Stdout);
+        Assert.DoesNotContain("Second", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_FileNotFound()
+    {
+        var result = _shell.Execute("sh /nonexistent.sh");
+        
+        Assert.False(result.Success);
+        Assert.Contains("No such file", result.Stderr);
+    }
+
+    [Fact]
+    public void Sh_MissingPath()
+    {
+        var result = _shell.Execute("sh");
+        
+        Assert.False(result.Success);
+        Assert.Contains("missing script path", result.Stderr);
+    }
+
+    [Fact]
+    public void Sh_ExecutesFileOperations()
+    {
+        _fs.WriteFile("/script.sh", "mkdir /testdir\ntouch /testdir/file.txt\necho done");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.True(result.Success);
+        Assert.True(_fs.Exists("/testdir"));
+        Assert.True(_fs.Exists("/testdir/file.txt"));
+    }
+
+    [Fact]
+    public void Sh_DirectExecution_WithDotSlash()
+    {
+        _fs.WriteFile("/script.sh", "echo Direct");
+        
+        var result = _shell.Execute("./script.sh");
+        
+        Assert.True(result.Success);
+        Assert.Equal("Direct", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_DirectExecution_WithAbsolutePath()
+    {
+        _fs.CreateDirectory("/scripts");
+        _fs.WriteFile("/scripts/test.sh", "echo Absolute");
+        
+        var result = _shell.Execute("/scripts/test.sh");
+        
+        Assert.True(result.Success);
+        Assert.Equal("Absolute", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_DirectExecution_WithArgs()
+    {
+        _fs.WriteFile("/script.sh", "echo $1");
+        
+        var result = _shell.Execute("./script.sh myarg");
+        
+        Assert.True(result.Success);
+        Assert.Equal("myarg", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_RestoresEnvironmentAfterExecution()
+    {
+        _shell.Execute("export VAR=original");
+        _fs.WriteFile("/script.sh", "export VAR=modified\necho $1");
+        
+        _shell.Execute("sh /script.sh test");
+        
+        // Check that positional parameters are restored (not leaking from script)
+        var result = _shell.Execute("echo $1");
+        Assert.Equal("", result.Stdout.Trim());
+    }
+
+    [Fact]
+    public void Sh_HandlesEmptyLines()
+    {
+        _fs.WriteFile("/script.sh", "echo First\n\n\necho Second");
+        
+        var result = _shell.Execute("sh /script.sh");
+        
+        Assert.True(result.Success);
+        Assert.Contains("First", result.Stdout);
+        Assert.Contains("Second", result.Stdout);
+    }
+
+    [Fact]
+    public void Sh_ExecutesNestedScript()
+    {
+        _fs.WriteFile("/outer.sh", "echo Outer\nsh /inner.sh\necho Done");
+        _fs.WriteFile("/inner.sh", "echo Inner");
+        
+        var result = _shell.Execute("sh /outer.sh");
+        
+        Assert.True(result.Success);
+        Assert.Contains("Outer", result.Stdout);
+        Assert.Contains("Inner", result.Stdout);
+        Assert.Contains("Done", result.Stdout);
+    }
+
+    #endregion
 }
