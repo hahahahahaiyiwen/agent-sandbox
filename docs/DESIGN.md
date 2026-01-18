@@ -62,11 +62,11 @@ Embed the sandbox directly in your application to provide agents with an isolate
 
 ### With Semantic Kernel
 
-The `AgentSandbox.SemanticKernel` package provides seamless integration with Microsoft Semantic Kernel.
+The `AgentSandbox.Extensions` package provides seamless integration with Microsoft Semantic Kernel.
 
 ```csharp
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Extensions.AgentSandbox;
+using AgentSandbox.Extensions.SemanticKernel;
 
 // Register sandbox services with the kernel builder
 var builder = Kernel.CreateBuilder();
@@ -202,7 +202,7 @@ AgentSandbox/
 │   └── Sandbox/                 # Sandbox management
 │       ├── AgentSandboxInstance.cs
 │       └── SandboxManager.cs
-├── AgentSandbox.SemanticKernel/ # Semantic Kernel integration
+├── AgentSandbox.Extensions/ # Semantic Kernel integration
 │   └── KernelExtensions.cs      # Extension methods for IKernelBuilder
 ├── AgentSandbox.Api/            # REST API server
 │   ├── Program.cs
@@ -213,7 +213,8 @@ AgentSandbox/
     ├── DESIGN.md                # This document (high-level)
     ├── SANDBOX_DESIGN.md        # Sandbox instance internals
     ├── FILESYSTEM_DESIGN.md     # Filesystem design
-    └── SHELL_EXTENSIONS.md      # Shell extension system
+    ├── SHELL_EXTENSIONS.md      # Shell extension system
+    └── OBSERVABILITY.md         # Monitoring and telemetry
 ```
 
 ---
@@ -224,3 +225,4 @@ AgentSandbox/
 - [FILESYSTEM_DESIGN.md](./FILESYSTEM_DESIGN.md) - FileSystem interfaces and storage abstraction
 - [SHELL_EXTENSIONS.md](./SHELL_EXTENSIONS.md) - Shell extension architecture, built-in commands, and roadmap
 - [AGENT_SKILLS.md](./AGENT_SKILLS.md) - Agent Skills integration for structured skill packages
+- [OBSERVABILITY.md](./OBSERVABILITY.md) - Production monitoring, OpenTelemetry integration, metrics and tracing

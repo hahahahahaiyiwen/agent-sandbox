@@ -6,7 +6,7 @@ using Microsoft.SemanticKernel;
 using System.Text;
 using System.Text.Json;
 
-namespace Microsoft.SemanticKernel.Extensions.AgentSandbox;
+namespace AgentSandbox.Extensions.SemanticKernel;
 
 /// <summary>
 /// Extension methods for registering Sandbox with Semantic Kernel.
@@ -14,34 +14,11 @@ namespace Microsoft.SemanticKernel.Extensions.AgentSandbox;
 public static class KernelExtensions
 {
     /// <summary>
-    /// Adds SandboxManager as a singleton service to the kernel.
-    /// Each sandbox is created on-demand via the manager.
-    /// </summary>
-    /// <param name="builder">The kernel builder.</param>
-    /// <param name="defaultOptions">Default options for new sandboxes.</param>
-    /// <returns>The kernel builder for chaining.</returns>
-    public static IKernelBuilder AddSandboxManager(
-        this IKernelBuilder builder,
-        SandboxOptions? defaultOptions = null)
-    {
-        builder.Services.AddSingleton(_ => new SandboxManager(defaultOptions));
-
-        builder.Services.AddScoped<Sandbox>(sp =>
-        {
-            var manager = sp.GetRequiredService<SandboxManager>();
-            return manager.Create();
-        });
-
-        return builder;
-    }
-
-    /// <summary>
     /// Creates a KernelFunction for sandbox command execution.
     /// </summary>
     /// <param name="kernel">The kernel instance.</param>
-    /// <param name="options">Optional sandbox options for description generation.</param>
     /// <returns>A KernelFunction that executes commands in the sandbox.</returns>
-    public static KernelFunction GetSandboxFunction(this Kernel kernel, SandboxOptions? options = null)
+    public static KernelFunction GetSandboxFunction(this Kernel kernel)
     {
         var sandbox = kernel.Services.GetRequiredService<Sandbox>();
 

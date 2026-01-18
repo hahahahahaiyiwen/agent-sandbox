@@ -238,32 +238,6 @@ public interface IFileSystemStats
 }
 
 /// <summary>
-/// Filesystem with watcher/notification capabilities.
-/// </summary>
-public interface IWatchableFileSystem : IFileSystem
-{
-    /// <summary>
-    /// Event raised when a file or directory is created.
-    /// </summary>
-    event EventHandler<FileSystemEventArgs>? Created;
-    
-    /// <summary>
-    /// Event raised when a file or directory is modified.
-    /// </summary>
-    event EventHandler<FileSystemEventArgs>? Changed;
-    
-    /// <summary>
-    /// Event raised when a file or directory is deleted.
-    /// </summary>
-    event EventHandler<FileSystemEventArgs>? Deleted;
-    
-    /// <summary>
-    /// Event raised when a file or directory is renamed/moved.
-    /// </summary>
-    event EventHandler<FileSystemRenamedEventArgs>? Renamed;
-}
-
-/// <summary>
 /// Event args for filesystem change events.
 /// </summary>
 public class FileSystemEventArgs : EventArgs

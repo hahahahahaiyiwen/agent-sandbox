@@ -1,5 +1,6 @@
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
+using AgentSandbox.Core.Telemetry;
 
 namespace AgentSandbox.Core;
 
@@ -41,6 +42,11 @@ public class SandboxOptions
     public string SkillsMountPath { get; set; } = "/.sandbox/skills";
 
     /// <summary>
+    /// Telemetry configuration. Default: disabled (opt-in).
+    /// </summary>
+    public SandboxTelemetryOptions? Telemetry { get; set; }
+
+    /// <summary>
     /// Creates a shallow copy of this options instance.
     /// </summary>
     public SandboxOptions Clone() => new()
@@ -53,6 +59,7 @@ public class SandboxOptions
         WorkingDirectory = WorkingDirectory,
         ShellExtensions = ShellExtensions.ToArray(),
         Skills = Skills.ToArray(),
-        SkillsMountPath = SkillsMountPath
+        SkillsMountPath = SkillsMountPath,
+        Telemetry = Telemetry
     };
 }

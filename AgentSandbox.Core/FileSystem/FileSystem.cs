@@ -15,6 +15,18 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
     private readonly FileSystemOptions _options;
     private readonly object _lock = new();
 
+    /// <inheritdoc />
+    public event EventHandler<FileSystemEventArgs>? Created;
+    
+    /// <inheritdoc />
+    public event EventHandler<FileSystemEventArgs>? Changed;
+    
+    /// <inheritdoc />
+    public event EventHandler<FileSystemEventArgs>? Deleted;
+    
+    /// <inheritdoc />
+    public event EventHandler<FileSystemRenamedEventArgs>? Renamed;
+
     /// <summary>
     /// Creates a new FileSystem with in-memory storage.
     /// </summary>
@@ -118,6 +130,8 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
                 IsDirectory = true,
                 Mode = 0755
             });
+            
+            Created?.Invoke(this, new FileSystemEventArgs(path, isDirectory: true));
         }
     }
 
@@ -194,11 +208,12 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
         {
             var existing = _storage.Get(path);
             var existingSize = existing?.Content.Length ?? 0;
+            var isNew = existing == null;
             ValidateTotalSize(content.Length - existingSize);
             
             if (!existing?.IsDirectory ?? true)
             {
-                ValidateNodeCount(existing == null);
+                ValidateNodeCount(isNew);
             }
             
             var parent = FileSystemPath.GetParent(path);
@@ -216,6 +231,8 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
                 existing.Content = content;
                 existing.ModifiedAt = DateTime.UtcNow;
                 _storage.Set(path, existing);
+                
+                Changed?.Invoke(this, new FileSystemEventArgs(path, isDirectory: false));
             }
             else
             {
@@ -227,6 +244,8 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
                     Content = content,
                     Mode = 0644
                 });
+                
+                Created?.Invoke(this, new FileSystemEventArgs(path, isDirectory: false));
             }
         }
     }
@@ -335,6 +354,8 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
             throw new InvalidOperationException($"Path is a directory, use DeleteDirectory: {path}");
         
         _storage.Delete(path);
+        
+        Deleted?.Invoke(this, new FileSystemEventArgs(path, isDirectory: false));
     }
     
     /// <inheritdoc />
@@ -367,6 +388,8 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
             }
 
             _storage.Delete(path);
+            
+            Deleted?.Invoke(this, new FileSystemEventArgs(path, isDirectory: true));
         }
     }
 
@@ -432,8 +455,16 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
     /// <inheritdoc />
     public void Move(string source, string destination, bool overwrite = false)
     {
+        source = FileSystemPath.Normalize(source);
+        destination = FileSystemPath.Normalize(destination);
+        
+        var sourceEntry = _storage.Get(source);
+        var isDirectory = sourceEntry?.IsDirectory ?? false;
+        
         Copy(source, destination, overwrite);
         Delete(source, recursive: true);
+        
+        Renamed?.Invoke(this, new FileSystemRenamedEventArgs(source, destination, isDirectory));
     }
 
     #endregion

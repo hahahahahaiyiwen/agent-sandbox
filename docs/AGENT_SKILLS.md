@@ -633,7 +633,7 @@ Response: {
   - [x] Add `sh` command
   - [x] Add `.sh` file execution support
   - [x] Add script positional parameters ($1, $2, $@, $#, $*)
-- [x] Update `AgentSandbox.SemanticKernel/KernelExtensions.cs`
+- [x] Update `AgentSandbox.Extensions/KernelExtensions.cs`
   - [x] Add `CreateGetSkillFunction()` with dynamic description
   - [x] Add `GetSkillFunction()` extension method
 - [x] Add unit tests

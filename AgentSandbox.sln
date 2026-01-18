@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Api", "AgentSa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Tests", "AgentSandbox.Tests\AgentSandbox.Tests.csproj", "{A9964E0E-6962-4171-9C35-1578246E584D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.SemanticKernel", "AgentSandbox.SemanticKernel\AgentSandbox.SemanticKernel.csproj", "{3B11AA4F-006B-4341-B2BA-2C04A05EF26F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Extensions", "AgentSandbox.Extensions\AgentSandbox.Extensions.csproj", "{3B11AA4F-006B-4341-B2BA-2C04A05EF26F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Playground", "AgentSandbox.Playground\AgentSandbox.Playground.csproj", "{41F4AF15-998B-4E19-A5CC-38B1C574E187}"
 EndProject

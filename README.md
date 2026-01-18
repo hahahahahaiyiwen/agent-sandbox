@@ -21,7 +21,7 @@ An in-memory agent sandbox with virtual filesystem and command-line interface fo
 │                    AgentSandbox.Api                         │
 │            (REST endpoints, Swagger UI)                     │
 ├─────────────────────────────────────────────────────────────┤
-│               AgentSandbox.SemanticKernel                   │
+│               AgentSandbox.Extensions                   │
 │         (Kernel extensions, AI function factory)            │
 ├─────────────────────────────────────────────────────────────┤
 │                    AgentSandbox.Core                        │
@@ -98,7 +98,7 @@ Integrate with Microsoft Semantic Kernel for AI agent tool calling:
 
 ```csharp
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Extensions.AgentSandbox;
+using AgentSandbox.Extensions.SemanticKernel;
 using AgentSandbox.Core;
 using AgentSandbox.Core.Shell.Extensions;
 
@@ -137,6 +137,74 @@ var result = await kernel.InvokePromptAsync(
 | `AddSandboxManager(options?)` | Registers SandboxManager as singleton, Sandbox as scoped service |
 | `GetSandboxFunction(options?)` | Creates a KernelFunction for command execution from DI |
 | `CreateSandboxFunction(sandbox)` | Static factory to create AIFunction from a Sandbox instance |
+
+### Use with Dependency Injection
+
+Register AgentSandbox services in any .NET application:
+
+```csharp
+using AgentSandbox.Extensions.DependencyInjection;
+using AgentSandbox.Core;
+
+// In Program.cs or Startup.cs
+builder.Services.AddAgentSandbox(options =>
+{
+    options.MaxTotalSize = 50 * 1024 * 1024; // 50 MB
+    options.MaxFileSize = 5 * 1024 * 1024;   // 5 MB
+});
+
+// Inject Sandbox into your services
+public class MyService
+{
+    private readonly Sandbox _sandbox;
+    
+    public MyService(Sandbox sandbox)
+    {
+        _sandbox = sandbox;
+    }
+    
+    public string RunCommand(string command)
+    {
+        var result = _sandbox.Execute(command);
+        return result.Success ? result.Stdout : result.Stderr;
+    }
+}
+```
+
+**Available DI Extension Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `AddAgentSandbox(configure?)` | Registers SandboxManager (singleton) and Sandbox (scoped) |
+| `AddAgentSandbox(factory)` | Uses factory for dynamic options from IServiceProvider |
+| `AddTransientSandbox(configure?)` | Registers Sandbox as transient (new instance per request) |
+| `AddSandboxManager(configure?)` | Registers only SandboxManager for manual control |
+
+### Use with Application Insights
+
+Add observability to your sandbox with Application Insights:
+
+```csharp
+using AgentSandbox.Extensions.ApplicationInsights;
+using Microsoft.ApplicationInsights;
+
+var telemetryClient = new TelemetryClient(configuration);
+
+// Enable telemetry in sandbox options
+var options = new SandboxOptions
+{
+    Telemetry = new SandboxTelemetryOptions { Enabled = true }
+};
+var sandbox = new Sandbox(options: options);
+
+// Subscribe to Application Insights
+using var subscription = sandbox.AddApplicationInsights(telemetryClient, opts =>
+{
+    opts.TrackCommands = true;
+    opts.TrackFileChanges = false; // Reduce noise
+    opts.TrackLifecycle = true;
+});
+```
 
 ## API Endpoints
 
@@ -346,7 +414,7 @@ AgentSandbox/
 │       ├── CurlCommand.cs           # HTTP client
 │       ├── JqCommand.cs             # JSON processor
 │       └── GitCommand.cs            # Simulated git
-├── AgentSandbox.SemanticKernel/     # Semantic Kernel integration
+├── AgentSandbox.Extensions/     # Semantic Kernel integration
 │   └── KernelExtensions.cs          # Kernel builder extensions
 ├── AgentSandbox.Playground/         # Interactive console app
 │   └── Program.cs
@@ -379,7 +447,7 @@ dotnet test
 dotnet pack AgentSandbox.Core -c Release -o ./nupkgs
 
 # Pack the Semantic Kernel integration (optional)
-dotnet pack AgentSandbox.SemanticKernel -c Release -o ./nupkgs
+dotnet pack AgentSandbox.Extensions -c Release -o ./nupkgs
 ```
 
 ### Reference in Your Project
@@ -394,7 +462,7 @@ dotnet nuget add source ./path/to/AgentSandbox/nupkgs --name LocalPackages
 
 # Add package reference
 dotnet add package AgentSandbox.Core
-dotnet add package AgentSandbox.SemanticKernel  # For Semantic Kernel integration
+dotnet add package AgentSandbox.Extensions  # For Semantic Kernel integration
 ```
 
 **Option 2: Direct Project Reference**
@@ -405,7 +473,7 @@ Reference the project directly in your `.csproj`:
 <ItemGroup>
   <ProjectReference Include="../AgentSandbox/AgentSandbox.Core/AgentSandbox.Core.csproj" />
   <!-- For Semantic Kernel integration -->
-  <ProjectReference Include="../AgentSandbox/AgentSandbox.SemanticKernel/AgentSandbox.SemanticKernel.csproj" />
+  <ProjectReference Include="../AgentSandbox/AgentSandbox.Extensions/AgentSandbox.Extensions.csproj" />
 </ItemGroup>
 ```
 
