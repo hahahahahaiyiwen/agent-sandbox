@@ -127,7 +127,7 @@ public class SandboxShell : ISandboxShell, IShellContext
 
         // Check for pipeline operator (not supported)
         var pipeIndex = FindUnquotedOperator(commandLine, "|");
-        if (pipeIndex > 0 && (pipeIndex + 1 >= commandLine.Length || commandLine[pipeIndex + 1] != '|'))
+        if (pipeIndex >= 0 && (pipeIndex + 1 >= commandLine.Length || commandLine[pipeIndex + 1] != '|'))
         {
             // Found | but not || (which would be logical OR, also unsupported but different error)
             return ShellResult.Error(
