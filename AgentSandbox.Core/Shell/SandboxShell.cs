@@ -15,7 +15,7 @@ public class SandboxShell : ISandboxShell, IShellContext
     private readonly IFileSystem _fs;
     private string _currentDirectory = "/";
     private readonly Dictionary<string, string> _environment = new();
-    private readonly Dictionary<string, Func<string[], ShellResult>> _builtinCommands;
+    private readonly Dictionary<string, (Func<string[], ShellResult> Handler, string Help)> _builtinCommands;
     private readonly Dictionary<string, IShellCommand> _extensionCommands = new();
 
     public string CurrentDirectory
@@ -38,28 +38,136 @@ public class SandboxShell : ISandboxShell, IShellContext
         _environment["PATH"] = "/bin:/usr/bin";
         _environment["PWD"] = _currentDirectory;
 
-        _builtinCommands = new Dictionary<string, Func<string[], ShellResult>>
+        _builtinCommands = new Dictionary<string, (Func<string[], ShellResult> Handler, string Help)>
         {
-            ["pwd"] = CmdPwd,
-            ["cd"] = CmdCd,
-            ["ls"] = CmdLs,
-            ["cat"] = CmdCat,
-            ["echo"] = CmdEcho,
-            ["mkdir"] = CmdMkdir,
-            ["rm"] = CmdRm,
-            ["cp"] = CmdCp,
-            ["mv"] = CmdMv,
-            ["touch"] = CmdTouch,
-            ["head"] = CmdHead,
-            ["tail"] = CmdTail,
-            ["wc"] = CmdWc,
-            ["grep"] = CmdGrep,
-            ["find"] = CmdFind,
-            ["env"] = CmdEnv,
-            ["export"] = CmdExport,
-            ["clear"] = _ => ShellResult.Ok(),
-            ["help"] = CmdHelp,
-            ["sh"] = CmdSh,
+            ["pwd"] = (CmdPwd, """
+                pwd - Print working directory
+
+                Usage: pwd
+                """),
+            ["cd"] = (CmdCd, """
+                cd - Change directory
+
+                Usage: cd [dir]
+                  cd ~     Go to home directory
+                  cd -     Go to previous directory
+                """),
+            ["ls"] = (CmdLs, """
+                ls - List directory contents
+
+                Usage: ls [-la] [path...]
+
+                Options:
+                  -a    Show hidden files (starting with .)
+                  -l    Long format with details
+                """),
+            ["cat"] = (CmdCat, """
+                cat - Display file contents
+
+                Usage: cat <file>...
+                """),
+            ["echo"] = (CmdEcho, """
+                echo - Print text to output
+
+                Usage: echo [text...]
+                """),
+            ["mkdir"] = (CmdMkdir, """
+                mkdir - Create directory
+
+                Usage: mkdir [-p] <dir>...
+
+                Options:
+                  -p    Create parent directories as needed
+                """),
+            ["rm"] = (CmdRm, """
+                rm - Remove files or directories
+
+                Usage: rm [-rf] <path>...
+
+                Options:
+                  -r, -R    Remove directories recursively
+                  -f        Force, ignore nonexistent files
+                """),
+            ["cp"] = (CmdCp, """
+                cp - Copy files or directories
+
+                Usage: cp <source>... <dest>
+                """),
+            ["mv"] = (CmdMv, """
+                mv - Move/rename files or directories
+
+                Usage: mv <source>... <dest>
+                """),
+            ["touch"] = (CmdTouch, """
+                touch - Create empty file or update timestamp
+
+                Usage: touch <file>...
+                """),
+            ["head"] = (CmdHead, """
+                head - Show first lines of file
+
+                Usage: head [-n N] <file>...
+
+                Options:
+                  -n N    Show first N lines (default: 10)
+                """),
+            ["tail"] = (CmdTail, """
+                tail - Show last lines of file
+
+                Usage: tail [-n N] <file>...
+
+                Options:
+                  -n N    Show last N lines (default: 10)
+                """),
+            ["wc"] = (CmdWc, """
+                wc - Count lines, words, and bytes
+
+                Usage: wc <file>...
+                """),
+            ["grep"] = (CmdGrep, """
+                grep - Search for pattern in files
+
+                Usage: grep [-in] <pattern> <file>...
+
+                Options:
+                  -i    Case insensitive search
+                  -n    Show line numbers
+                """),
+            ["find"] = (CmdFind, """
+                find - Find files by name
+
+                Usage: find [path] [-name pattern]
+
+                Options:
+                  -name <pattern>    Filter by filename pattern (supports * and ?)
+                """),
+            ["env"] = (CmdEnv, """
+                env - Show environment variables
+
+                Usage: env
+                """),
+            ["export"] = (CmdExport, """
+                export - Set environment variable
+
+                Usage: export VAR=value
+                """),
+            ["clear"] = (_ => ShellResult.Ok(), """
+                clear - Clear screen
+
+                Usage: clear
+                """),
+            ["help"] = (CmdHelp, """
+                help - Show available commands
+
+                Usage: help
+
+                Tip: Use '<command> -h' for help on a specific command.
+                """),
+            ["sh"] = (CmdSh, """
+                sh - Execute shell script
+
+                Usage: sh <script.sh> [args...]
+                """),
         };
     }
 
@@ -182,11 +290,19 @@ public class SandboxShell : ISandboxShell, IShellContext
             }
         }
         // Check built-in commands first
-        else if (_builtinCommands.TryGetValue(cmdLower, out var handler))
+        else if (_builtinCommands.TryGetValue(cmdLower, out var command))
         {
             try
             {
-                result = handler(args);
+                // Check for -h help argument
+                if (args.Length > 0 && args[0] == "-h")
+                {
+                    result = ShellResult.Ok(command.Help);
+                }
+                else
+                {
+                    result = command.Handler(args);
+                }
             }
             catch (Exception ex)
             {
@@ -905,6 +1021,8 @@ public class SandboxShell : ISandboxShell, IShellContext
         output.AppendLine("  export VAR=val   Set environment variable");
         output.AppendLine("  sh <script>      Execute shell script");
         output.AppendLine("  help             Show this help");
+        output.AppendLine();
+        output.AppendLine("Use '<command> -h' for detailed help on a specific command.");
         return ShellResult.Ok(output.ToString().TrimEnd());
     }
 

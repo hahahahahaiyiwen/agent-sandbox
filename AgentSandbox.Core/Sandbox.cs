@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using AgentSandbox.Core.FileSystem;
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
@@ -101,6 +102,29 @@ public class Sandbox : IDisposable, IObservableSandbox
     /// Gets information about all mounted skills.
     /// </summary>
     public IReadOnlyList<SkillInfo> GetMountedSkills() => _mountedSkills.AsReadOnly();
+
+    /// <summary>
+    /// Gets a description of mounted skills for use in AI function descriptions.
+    /// </summary>
+    public string GetMountedSkillsDescription()
+    {
+        if (_mountedSkills.Count == 0)
+        {
+            return "Gets detailed information about an agent skill. No skills are currently available.";
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Gets detailed information about an agent skill.");
+        sb.AppendLine();
+        sb.AppendLine("Available skills:");
+
+        foreach (var skill in _mountedSkills)
+        {
+            sb.AppendLine($"  - {skill.Name}: {skill.Description}. Mounted at {skill.MountPath}");
+        }
+
+        return sb.ToString();
+    }
     
     private void MountSkills()
     {
@@ -267,6 +291,23 @@ public class Sandbox : IDisposable, IObservableSandbox
         }
         
         LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Gets a description of the sandbox tool for use in AI function descriptions.
+    /// Dynamically includes all available commands and extensions.
+    /// </summary>
+    public string GetToolDescription()
+    {
+        var sb = new StringBuilder();
+        
+        sb.Append("Execute a command in a sandboxed bash terminal. ");
+        sb.Append($"Available commands: {string.Join(", ", _shell.GetAvailableCommands())}. ");
+        sb.Append("Run 'help' to list commands or '<command> -h' for detailed help on a specific command. ");
+        sb.Append("Commands use short-style arguments (e.g., -l, -a, -n). ");
+        sb.Append("Use > to write output to file, >> to append.");
+
+        return sb.ToString();
     }
 
     /// <summary>
