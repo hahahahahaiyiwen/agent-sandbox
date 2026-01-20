@@ -240,7 +240,62 @@ public class SandboxShellTests
         Assert.Contains("cd", result.Stdout);
         Assert.Contains("ls", result.Stdout);
         Assert.Contains("sh", result.Stdout);
+        Assert.Contains("-h", result.Stdout); // Should mention -h for command help
     }
+
+    #region Command Help Tests
+
+    [Theory]
+    [InlineData("pwd")]
+    [InlineData("cd")]
+    [InlineData("ls")]
+    [InlineData("cat")]
+    [InlineData("echo")]
+    [InlineData("mkdir")]
+    [InlineData("rm")]
+    [InlineData("cp")]
+    [InlineData("mv")]
+    [InlineData("touch")]
+    [InlineData("head")]
+    [InlineData("tail")]
+    [InlineData("wc")]
+    [InlineData("grep")]
+    [InlineData("find")]
+    [InlineData("env")]
+    [InlineData("export")]
+    [InlineData("sh")]
+    [InlineData("clear")]
+    [InlineData("help")]
+    public void BuiltinCommands_SupportHelpFlag(string command)
+    {
+        var result = _shell.Execute($"{command} -h");
+
+        Assert.True(result.Success, $"{command} -h should succeed");
+        Assert.False(string.IsNullOrEmpty(result.Stdout), $"{command} -h should return help text");
+        Assert.Contains("Usage:", result.Stdout, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LsHelp_ShowsOptions()
+    {
+        var result = _shell.Execute("ls -h");
+
+        Assert.True(result.Success);
+        Assert.Contains("-a", result.Stdout);
+        Assert.Contains("-l", result.Stdout);
+    }
+
+    [Fact]
+    public void GrepHelp_ShowsOptions()
+    {
+        var result = _shell.Execute("grep -h");
+
+        Assert.True(result.Success);
+        Assert.Contains("-i", result.Stdout);
+        Assert.Contains("-n", result.Stdout);
+    }
+
+    #endregion
 
     #region sh Command Tests
 

@@ -216,6 +216,7 @@ AgentSandbox/
     ├── SHELL_EXTENSIONS.md      # Shell extension system
     ├── AGENT_SKILLS.md          # Agent Skills integration
     ├── OBSERVABILITY.md         # Monitoring and telemetry
+    ├── PYTHON_RUNTIME.md        # Python script execution support
     └── ROADMAP.md               # Feature roadmap and priorities
 ```
 
@@ -228,4 +229,5 @@ AgentSandbox/
 - [SHELL_EXTENSIONS.md](./SHELL_EXTENSIONS.md) - Shell extension architecture, built-in commands, and roadmap
 - [AGENT_SKILLS.md](./AGENT_SKILLS.md) - Agent Skills integration for structured skill packages
 - [OBSERVABILITY.md](./OBSERVABILITY.md) - Production monitoring, OpenTelemetry integration, metrics and tracing
+- [PYTHON_RUNTIME.md](./PYTHON_RUNTIME.md) - Python script execution via subprocess
 - [ROADMAP.md](./ROADMAP.md) - Feature roadmap, priorities, and version milestones

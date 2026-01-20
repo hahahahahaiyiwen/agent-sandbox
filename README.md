@@ -7,11 +7,10 @@ An in-memory agent sandbox with virtual filesystem and command-line interface fo
 - **In-Memory Virtual Filesystem**: Full POSIX-like filesystem that never touches disk
 - **Sandboxed Shell**: Unix-style CLI emulator with 18+ built-in commands
 - **Shell Extensions**: Extensible command system with `curl`, `jq`, `git` and more
-- **Semantic Kernel Integration**: Ready-to-use AI function for agent tool calling
-- **Thread-Safe**: Concurrent access support with proper locking
+- **Agent Skill Integration**: Easy mounting of reusable agent skills into the sandbox filesystem 
+- **Self-Discovery Support**: Enhanced documentation via `help` and `<command> -h` to enable agent's self-discovery
 - **Snapshots**: Save and restore complete sandbox state
 - **Resource Limits**: Configurable max file size, total storage, and node count
-- **REST API**: Full HTTP API for remote sandbox management
 - **Zero Dependencies**: Pure .NET implementation, no external services required
 
 ## Architecture
