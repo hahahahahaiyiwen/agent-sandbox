@@ -1,0 +1,115 @@
+# AgentSandbox.Core
+
+A lightweight, in-memory virtual filesystem and shell for AI agents. Zero external dependencies.
+
+## Installation
+
+```bash
+dotnet add package AgentSandbox.Core
+```
+
+## Quick Start
+
+```csharp
+using AgentSandbox.Core;
+
+// Create a sandbox
+var sandbox = new Sandbox();
+
+// Execute shell commands
+var result = sandbox.Execute("echo 'Hello, Agent!'");
+Console.WriteLine(result.Stdout); // Hello, Agent!
+
+// File operations
+sandbox.Execute("mkdir -p /workspace/src");
+sandbox.Execute("echo 'console.log(1)' > /workspace/src/app.js");
+sandbox.Execute("cat /workspace/src/app.js");
+```
+
+## Configuration
+
+```csharp
+var options = new SandboxOptions
+{
+    WorkingDirectory = "/workspace",
+    MaxTotalSize = 1024 * 1024,  // 1MB total storage
+    MaxFileSize = 64 * 1024,     // 64KB per file
+    MaxNodeCount = 5000,
+    Environment = new() { ["HOME"] = "/home/agent" }
+};
+
+var sandbox = new Sandbox("agent-1", options);
+```
+
+## Mounting Files
+
+```csharp
+var options = new SandboxOptions
+{
+    Mounts = [
+        new FileMountOptions { Path = "/data", Source = new FileSystemSource("C:/my-data") },
+        new FileMountOptions { Path = "/config", Source = new InMemorySource()
+            .AddFile("settings.json", """{"debug": true}""") }
+    ]
+};
+```
+
+## Agent Skills
+
+Mount [agentskills.io](https://agentskills.io) compatible skill packages:
+
+```csharp
+var options = new SandboxOptions
+{
+    AgentSkills = new AgentSkillOptions
+    {
+        Skills = [
+            AgentSkill.FromPath("C:/skills/python-dev"),
+            AgentSkill.FromFiles(new Dictionary<string, string>
+            {
+                ["SKILL.md"] = "---\nname: my-skill\ndescription: Custom skill\n---\n# Instructions..."
+            })
+        ]
+    }
+};
+
+var sandbox = new Sandbox(options: options);
+
+// Access skill instructions
+var skills = sandbox.GetMountedSkills();
+Console.WriteLine(skills[0].Metadata.Instructions);
+
+// Execute skill scripts
+sandbox.Execute("sh /.sandbox/skills/python-dev/scripts/setup.sh");
+```
+
+## Built-in Commands
+
+| Command | Description |
+|---------|-------------|
+| `ls`, `cd`, `pwd` | Directory navigation |
+| `cat`, `head`, `tail` | File viewing |
+| `mkdir`, `touch`, `rm`, `cp`, `mv` | File management |
+| `echo`, `grep`, `find`, `wc` | Text processing |
+| `env`, `export` | Environment variables |
+| `sh` | Script execution |
+| `help` | List commands (`<cmd> -h` for details) |
+
+## Snapshots
+
+```csharp
+// Save state
+var snapshot = sandbox.CreateSnapshot();
+
+// Restore later
+sandbox.RestoreSnapshot(snapshot);
+```
+
+## Thread Safety
+
+Sandbox instances are thread-safe for concurrent command execution.
+
+## See Also
+
+- [AgentSandbox.Extensions](../AgentSandbox.Extensions) - Shell extensions (curl, git, jq) and Semantic Kernel integration
+- [Agent Skills Specification](https://agentskills.io/specification)
