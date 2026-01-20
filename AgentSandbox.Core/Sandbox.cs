@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using AgentSandbox.Core.FileSystem;
+using AgentSandbox.Core.Mounting;
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
 using AgentSandbox.Core.Telemetry;
@@ -88,6 +89,9 @@ public class Sandbox : IDisposable, IObservableSandbox
             _shell.RegisterCommand(cmd);
         }
 
+        // Mount files
+        MountFiles();
+
         // Mount agent skills
         MountSkills();
 
@@ -101,39 +105,44 @@ public class Sandbox : IDisposable, IObservableSandbox
     /// <summary>
     /// Gets information about all mounted skills.
     /// </summary>
-    public IReadOnlyList<SkillInfo> GetMountedSkills() => _mountedSkills.AsReadOnly();
+    public IReadOnlyList<SkillInfo> GetSkills() => _mountedSkills.AsReadOnly();
 
     /// <summary>
     /// Gets a description of mounted skills for use in AI function descriptions.
+    /// Uses the XML format recommended by agentskills.io specification.
     /// </summary>
-    public string GetMountedSkillsDescription()
+    public string GetSkillsDescription()
     {
         if (_mountedSkills.Count == 0)
         {
-            return "Gets detailed information about an agent skill. No skills are currently available.";
+            return "No skills are currently available.";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine("Gets detailed information about an agent skill.");
-        sb.AppendLine();
-        sb.AppendLine("Available skills:");
+        sb.AppendLine("<available_skills>");
 
         foreach (var skill in _mountedSkills)
         {
-            sb.AppendLine($"  - {skill.Name}: {skill.Description}. Mounted at {skill.MountPath}");
+            sb.AppendLine("  <skill>");
+            sb.AppendLine($"    <name>{skill.Name}</name>");
+            sb.AppendLine($"    <description>{skill.Description}</description>");
+            sb.AppendLine($"    <location>{skill.MountPath}/SKILL.md</location>");
+            sb.AppendLine("  </skill>");
         }
+
+        sb.AppendLine("</available_skills>");
 
         return sb.ToString();
     }
     
     private void MountSkills()
     {
-        if (_options.Skills.Count == 0) return;
+        if (_options.AgentSkills.Skills.Count == 0) return;
 
         // Create skills base directory
-        _fileSystem.CreateDirectory(_options.SkillsMountPath);
+        _fileSystem.CreateDirectory(_options.AgentSkills.MountPath);
 
-        foreach (var skill in _options.Skills)
+        foreach (var skill in _options.AgentSkills.Skills)
         {
             var skillInfo = MountSkill(skill);
             _mountedSkills.Add(skillInfo);
@@ -158,25 +167,10 @@ public class Sandbox : IDisposable, IObservableSandbox
 
         // Use name from AgentSkill if provided, otherwise from SKILL.md
         var skillName = skill.Name ?? metadata.Name;
-        var mountPath = $"{_options.SkillsMountPath}/{skillName}";
+        var mountPath = $"{_options.AgentSkills.MountPath}/{skillName}";
 
-        // Create mount directory
-        _fileSystem.CreateDirectory(mountPath);
-
-        // Copy all files to virtual filesystem
-        foreach (var file in files)
-        {
-            var destPath = $"{mountPath}/{file.RelativePath}";
-            
-            // Ensure parent directory exists
-            var parentDir = destPath[..destPath.LastIndexOf('/')];
-            if (parentDir != mountPath && !_fileSystem.Exists(parentDir))
-            {
-                _fileSystem.CreateDirectory(parentDir);
-            }
-
-            _fileSystem.WriteFile(destPath, file.Content);
-        }
+        // Mount files to the path
+        MountFilesInternal(mountPath, files);
 
         return new SkillInfo
         {
@@ -185,6 +179,46 @@ public class Sandbox : IDisposable, IObservableSandbox
             MountPath = mountPath,
             Metadata = metadata
         };
+    }
+
+    private void MountFiles()
+    {
+        foreach (var mount in _options.Mounts)
+        {
+            var files = mount.Source.GetFiles().ToList();
+            MountFilesInternal(mount.Path, files);
+        }
+    }
+
+    private void MountFilesInternal(string destPath, IReadOnlyList<FileData> files)
+    {
+        // Normalize path
+        if (!destPath.StartsWith("/"))
+        {
+            destPath = "/" + destPath;
+        }
+
+        // Create mount directory
+        _fileSystem.CreateDirectory(destPath);
+
+        // Copy all files to virtual filesystem
+        foreach (var file in files)
+        {
+            var filePath = $"{destPath}/{file.RelativePath}";
+            
+            // Ensure parent directory exists
+            var lastSlash = filePath.LastIndexOf('/');
+            if (lastSlash > 0)
+            {
+                var parentDir = filePath[..lastSlash];
+                if (parentDir != destPath && !_fileSystem.Exists(parentDir))
+                {
+                    _fileSystem.CreateDirectory(parentDir);
+                }
+            }
+
+            _fileSystem.WriteFile(filePath, file.Content);
+        }
     }
 
     /// <summary>

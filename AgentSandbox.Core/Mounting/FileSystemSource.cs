@@ -1,27 +1,28 @@
-namespace AgentSandbox.Core.Skills;
+namespace AgentSandbox.Core.Mounting;
 
 /// <summary>
-/// Loads skill files from a local filesystem directory.
+/// Loads files from a local filesystem directory.
+/// Can be used for mounting any files (skills, data, templates, etc.) into the sandbox.
 /// </summary>
-public class FileSystemSkillSource : ISkillSource
+public class FileSystemSource : IFileSource
 {
     private readonly string _rootPath;
 
-    public FileSystemSkillSource(string rootPath)
+    public FileSystemSource(string rootPath)
     {
         if (!Directory.Exists(rootPath))
         {
-            throw new DirectoryNotFoundException($"Skill directory not found: {rootPath}");
+            throw new DirectoryNotFoundException($"Directory not found: {rootPath}");
         }
         _rootPath = rootPath;
     }
 
-    public IEnumerable<SkillFile> GetFiles()
+    public IEnumerable<FileData> GetFiles()
     {
         return GetFilesRecursive(_rootPath, "");
     }
 
-    private IEnumerable<SkillFile> GetFilesRecursive(string currentPath, string relativePath)
+    private IEnumerable<FileData> GetFilesRecursive(string currentPath, string relativePath)
     {
         // Get files in current directory
         foreach (var file in Directory.GetFiles(currentPath))
@@ -31,7 +32,7 @@ public class FileSystemSkillSource : ISkillSource
                 ? fileName 
                 : $"{relativePath}/{fileName}";
 
-            yield return new SkillFile
+            yield return new FileData
             {
                 RelativePath = relPath,
                 Content = File.ReadAllBytes(file)

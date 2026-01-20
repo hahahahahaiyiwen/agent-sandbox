@@ -2,7 +2,6 @@ using AgentSandbox.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
-using System.Text.Json;
 
 namespace AgentSandbox.Extensions.SemanticKernel;
 
@@ -62,12 +61,12 @@ public static class KernelExtensions
         return AIFunctionFactory.Create(
             (string skillName) => GetSkillImplementation(sandbox, skillName),
             name: "GetSkill",
-            description: sandbox.GetMountedSkillsDescription());
+            description: sandbox.GetSkillsDescription());
     }
 
     private static string GetSkillImplementation(Sandbox sandbox, string skillName)
     {
-        var skill = sandbox.GetMountedSkills()
+        var skill = sandbox.GetSkills()
             .FirstOrDefault(s => s.Name.Equals(skillName, StringComparison.OrdinalIgnoreCase));
 
         if (skill?.Metadata?.Instructions == null)

@@ -16,11 +16,14 @@ Sandbox sandbox = new Sandbox(options: new SandboxOptions
         new JqCommand(),
         new GitCommand()
     },
-    Skills = 
-    [
-        AgentSkill.FromPath(Path.Combine(skillsPath, "brainstorming")),
-        AgentSkill.FromPath(Path.Combine(skillsPath, "executing-plans"))
-    ],
+    AgentSkills = new AgentSkillOptions
+    {
+        Skills = 
+        [
+            AgentSkill.FromPath(Path.Combine(skillsPath, "brainstorming")),
+            AgentSkill.FromPath(Path.Combine(skillsPath, "executing-plans"))
+        ]
+    },
     Telemetry = new SandboxTelemetryOptions
     {
         Enabled = true

@@ -1,30 +1,31 @@
 using System.Reflection;
 
-namespace AgentSandbox.Core.Skills;
+namespace AgentSandbox.Core.Mounting;
 
 /// <summary>
-/// Loads skill files from embedded resources in an assembly.
+/// Loads files from embedded resources in an assembly.
+/// Can be used for mounting any files (skills, data, templates, etc.) into the sandbox.
 /// </summary>
-public class EmbeddedSkillSource : ISkillSource
+public class EmbeddedSource : IFileSource
 {
     private readonly Assembly _assembly;
     private readonly string _resourcePrefix;
 
     /// <summary>
-    /// Creates a skill source from embedded resources.
+    /// Creates a source from embedded resources.
     /// </summary>
     /// <param name="assembly">The assembly containing embedded resources.</param>
     /// <param name="resourcePrefix">
-    /// The resource name prefix (e.g., "MyApp.Skills.PythonDev").
-    /// Resources should be named like "MyApp.Skills.PythonDev.SKILL.md".
+    /// The resource name prefix (e.g., "MyApp.Resources.Data").
+    /// Resources should be named like "MyApp.Resources.Data.config.json".
     /// </param>
-    public EmbeddedSkillSource(Assembly assembly, string resourcePrefix)
+    public EmbeddedSource(Assembly assembly, string resourcePrefix)
     {
         _assembly = assembly;
         _resourcePrefix = resourcePrefix.TrimEnd('.');
     }
 
-    public IEnumerable<SkillFile> GetFiles()
+    public IEnumerable<FileData> GetFiles()
     {
         var prefix = _resourcePrefix + ".";
         var resourceNames = _assembly.GetManifestResourceNames()
@@ -39,10 +40,10 @@ public class EmbeddedSkillSource : ISkillSource
             stream.CopyTo(ms);
 
             // Convert resource name to relative path
-            // e.g., "MyApp.Skills.PythonDev.scripts.setup.sh" -> "scripts/setup.sh"
+            // e.g., "MyApp.Resources.Data.scripts.setup.sh" -> "scripts/setup.sh"
             var relativePath = ConvertResourceNameToPath(resourceName, prefix);
 
-            yield return new SkillFile
+            yield return new FileData
             {
                 RelativePath = relativePath,
                 Content = ms.ToArray()
@@ -57,12 +58,12 @@ public class EmbeddedSkillSource : ISkillSource
 
         // Handle file extension - the last dot before extension is the real separator
         // e.g., "scripts.setup.sh" -> "scripts/setup.sh"
-        // e.g., "SKILL.md" -> "SKILL.md"
+        // e.g., "config.json" -> "config.json"
         
         var parts = path.Split('.');
         if (parts.Length <= 2)
         {
-            // Simple case: "SKILL.md" or just "file"
+            // Simple case: "config.json" or just "file"
             return path;
         }
 

@@ -1,26 +1,27 @@
 using System.Text;
 
-namespace AgentSandbox.Core.Skills;
+namespace AgentSandbox.Core.Mounting;
 
 /// <summary>
-/// Loads skill files from in-memory dictionary. Useful for testing and dynamic skill creation.
+/// Loads files from in-memory dictionary. Useful for testing and dynamic content.
+/// Can be used for mounting any files (skills, data, templates, etc.) into the sandbox.
 /// </summary>
-public class InMemorySkillSource : ISkillSource
+public class InMemorySource : IFileSource
 {
     private readonly Dictionary<string, byte[]> _files = new();
 
     /// <summary>
-    /// Creates an empty in-memory skill source.
+    /// Creates an empty in-memory source.
     /// </summary>
-    public InMemorySkillSource()
+    public InMemorySource()
     {
     }
 
     /// <summary>
-    /// Creates an in-memory skill source with string content.
+    /// Creates an in-memory source with string content.
     /// </summary>
     /// <param name="files">Dictionary of relative path to string content.</param>
-    public InMemorySkillSource(IDictionary<string, string> files)
+    public InMemorySource(IDictionary<string, string> files)
     {
         foreach (var (path, content) in files)
         {
@@ -29,10 +30,10 @@ public class InMemorySkillSource : ISkillSource
     }
 
     /// <summary>
-    /// Creates an in-memory skill source with byte content.
+    /// Creates an in-memory source with byte content.
     /// </summary>
     /// <param name="files">Dictionary of relative path to byte content.</param>
-    public InMemorySkillSource(IDictionary<string, byte[]> files)
+    public InMemorySource(IDictionary<string, byte[]> files)
     {
         foreach (var (path, content) in files)
         {
@@ -43,7 +44,7 @@ public class InMemorySkillSource : ISkillSource
     /// <summary>
     /// Adds a file with string content.
     /// </summary>
-    public InMemorySkillSource AddFile(string relativePath, string content)
+    public InMemorySource AddFile(string relativePath, string content)
     {
         _files[NormalizePath(relativePath)] = Encoding.UTF8.GetBytes(content);
         return this;
@@ -52,15 +53,15 @@ public class InMemorySkillSource : ISkillSource
     /// <summary>
     /// Adds a file with byte content.
     /// </summary>
-    public InMemorySkillSource AddFile(string relativePath, byte[] content)
+    public InMemorySource AddFile(string relativePath, byte[] content)
     {
         _files[NormalizePath(relativePath)] = content;
         return this;
     }
 
-    public IEnumerable<SkillFile> GetFiles()
+    public IEnumerable<FileData> GetFiles()
     {
-        return _files.Select(kvp => new SkillFile
+        return _files.Select(kvp => new FileData
         {
             RelativePath = kvp.Key,
             Content = kvp.Value

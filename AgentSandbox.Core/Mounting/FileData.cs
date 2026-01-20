@@ -1,12 +1,12 @@
-namespace AgentSandbox.Core.Skills;
+namespace AgentSandbox.Core.Mounting;
 
 /// <summary>
-/// Represents a file within a skill package.
+/// Represents a file to be mounted into the sandbox filesystem.
 /// </summary>
-public class SkillFile
+public class FileData
 {
     /// <summary>
-    /// Relative path within the skill (e.g., "SKILL.md", "scripts/setup.sh").
+    /// Relative path within the source (e.g., "SKILL.md", "scripts/setup.sh", "data/config.json").
     /// Uses forward slashes as path separator.
     /// </summary>
     public required string RelativePath { get; init; }
@@ -20,15 +20,4 @@ public class SkillFile
     /// Gets the content as a UTF-8 string.
     /// </summary>
     public string GetContentAsString() => System.Text.Encoding.UTF8.GetString(Content);
-}
-
-/// <summary>
-/// Abstraction for loading skill files from various sources.
-/// </summary>
-public interface ISkillSource
-{
-    /// <summary>
-    /// Gets all files in the skill package.
-    /// </summary>
-    IEnumerable<SkillFile> GetFiles();
 }

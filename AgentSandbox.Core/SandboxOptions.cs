@@ -1,3 +1,4 @@
+using AgentSandbox.Core.Mounting;
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
 using AgentSandbox.Core.Telemetry;
@@ -9,14 +10,14 @@ namespace AgentSandbox.Core;
 /// </summary>
 public class SandboxOptions
 {
-    /// <summary>Maximum total size of all files in bytes (default: 100MB).</summary>
-    public long MaxTotalSize { get; set; } = 100 * 1024 * 1024;
+    /// <summary>Maximum total size of all files in bytes (default: 256KB).</summary>
+    public long MaxTotalSize { get; set; } = 256 * 1024;
     
-    /// <summary>Maximum size of a single file in bytes (default: 10MB).</summary>
-    public long MaxFileSize { get; set; } = 10 * 1024 * 1024;
+    /// <summary>Maximum size of a single file in bytes (default: 16KB).</summary>
+    public long MaxFileSize { get; set; } = 16 * 1024;
     
-    /// <summary>Maximum number of files/directories (default: 10000).</summary>
-    public int MaxNodeCount { get; set; } = 10000;
+    /// <summary>Maximum number of files/directories (default: 1000).</summary>
+    public int MaxNodeCount { get; set; } = 1000;
     
     /// <summary>Command execution timeout (default: 30 seconds).</summary>
     public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(30);
@@ -31,15 +32,15 @@ public class SandboxOptions
     public IEnumerable<IShellCommand> ShellExtensions { get; set; } = Array.Empty<IShellCommand>();
 
     /// <summary>
-    /// Agent skills to mount into the sandbox filesystem.
-    /// Skills are copied to /.sandbox/skills/{name}/ at initialization.
+    /// Files to mount into the sandbox filesystem at initialization.
+    /// Each mount specifies a destination path and file source.
     /// </summary>
-    public IReadOnlyList<AgentSkill> Skills { get; set; } = [];
+    public IReadOnlyList<FileMountOptions> Mounts { get; set; } = [];
 
     /// <summary>
-    /// Base path where skills are mounted. Default: /.sandbox/skills
+    /// Agent skills configuration. Skills are mounted at initialization.
     /// </summary>
-    public string SkillsMountPath { get; set; } = "/.sandbox/skills";
+    public AgentSkillOptions AgentSkills { get; set; } = new();
 
     /// <summary>
     /// Telemetry configuration. Default: disabled (opt-in).
@@ -58,8 +59,12 @@ public class SandboxOptions
         Environment = new Dictionary<string, string>(Environment),
         WorkingDirectory = WorkingDirectory,
         ShellExtensions = ShellExtensions.ToArray(),
-        Skills = Skills.ToArray(),
-        SkillsMountPath = SkillsMountPath,
+        Mounts = Mounts.ToArray(),
+        AgentSkills = new AgentSkillOptions
+        {
+            Skills = AgentSkills.Skills.ToArray(),
+            MountPath = AgentSkills.MountPath
+        },
         Telemetry = Telemetry
     };
 }

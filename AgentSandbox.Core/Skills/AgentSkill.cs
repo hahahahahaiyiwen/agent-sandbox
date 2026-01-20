@@ -1,3 +1,4 @@
+using AgentSandbox.Core.Mounting;
 using System.Reflection;
 
 namespace AgentSandbox.Core.Skills;
@@ -17,7 +18,7 @@ public class AgentSkill
     /// <summary>
     /// Source for loading skill files.
     /// </summary>
-    public required ISkillSource Source { get; init; }
+    public required IFileSource Source { get; init; }
 
     /// <summary>
     /// Creates a skill from a local filesystem path.
@@ -29,7 +30,7 @@ public class AgentSkill
         return new AgentSkill
         {
             Name = name,
-            Source = new FileSystemSkillSource(path)
+            Source = new FileSystemSource(path)
         };
     }
 
@@ -47,7 +48,7 @@ public class AgentSkill
         return new AgentSkill
         {
             Name = name,
-            Source = new EmbeddedSkillSource(assembly, resourcePrefix)
+            Source = new EmbeddedSource(assembly, resourcePrefix)
         };
     }
 
@@ -61,16 +62,16 @@ public class AgentSkill
         return new AgentSkill
         {
             Name = name,
-            Source = new InMemorySkillSource(files)
+            Source = new InMemorySource(files)
         };
     }
 
     /// <summary>
-    /// Creates a skill from an InMemorySkillSource. Useful for fluent building.
+    /// Creates a skill from an IFileSource. Useful for fluent building.
     /// </summary>
-    /// <param name="source">The in-memory skill source.</param>
+    /// <param name="source">The file source.</param>
     /// <param name="name">Optional name override. If not provided, uses name from SKILL.md.</param>
-    public static AgentSkill FromSource(ISkillSource source, string? name = null)
+    public static AgentSkill FromSource(IFileSource source, string? name = null)
     {
         return new AgentSkill
         {
