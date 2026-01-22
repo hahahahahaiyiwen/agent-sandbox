@@ -55,11 +55,12 @@ public class SandboxShell : ISandboxShell, IShellContext
             ["ls"] = (CmdLs, """
                 ls - List directory contents
 
-                Usage: ls [-la] [path...]
+                Usage: ls [-laR] [path...]
 
                 Options:
                   -a    Show hidden files (starting with .)
                   -l    Long format with details
+                  -R    List subdirectories recursively
                 """),
             ["cat"] = (CmdCat, """
                 cat - Display file contents
@@ -91,7 +92,10 @@ public class SandboxShell : ISandboxShell, IShellContext
             ["cp"] = (CmdCp, """
                 cp - Copy files or directories
 
-                Usage: cp <source>... <dest>
+                Usage: cp [-r] <source>... <dest>
+
+                Options:
+                  -r, -R    Copy directories recursively
                 """),
             ["mv"] = (CmdMv, """
                 mv - Move/rename files or directories
@@ -127,11 +131,12 @@ public class SandboxShell : ISandboxShell, IShellContext
             ["grep"] = (CmdGrep, """
                 grep - Search for pattern in files
 
-                Usage: grep [-in] <pattern> <file>...
+                Usage: grep [-inr] <pattern> <file|dir>...
 
                 Options:
                   -i    Case insensitive search
                   -n    Show line numbers
+                  -r    Search directories recursively
                 """),
             ["find"] = (CmdFind, """
                 find - Find files by name
@@ -266,13 +271,15 @@ public class SandboxShell : ISandboxShell, IShellContext
         }
 
         // Simple command parsing (doesn't handle all edge cases)
-        var parts = ParseCommandLine(commandLine);
+        var (parts, wasQuoted) = ParseCommandLineWithQuoteInfo(commandLine);
         if (parts.Length == 0)
             return ShellResult.Ok();
 
         var cmd = parts[0];
         var cmdLower = cmd.ToLowerInvariant();
-        var args = parts.Skip(1).ToArray();
+        
+        // Expand globs in arguments (skip command name, skip quoted args)
+        var args = ExpandGlobs(parts.Skip(1).ToArray(), wasQuoted.Skip(1).ToArray());
 
         ShellResult result;
         
@@ -355,15 +362,39 @@ public class SandboxShell : ISandboxShell, IShellContext
 
     private string[] ParseCommandLine(string commandLine)
     {
+        var (parts, _) = ParseCommandLineWithQuoteInfo(commandLine);
+        return parts;
+    }
+
+    private (string[] Parts, bool[] WasQuoted) ParseCommandLineWithQuoteInfo(string commandLine)
+    {
         var parts = new List<string>();
+        var wasQuoted = new List<bool>();
         var current = new StringBuilder();
         var inQuote = false;
         var quoteChar = '\0';
+        var currentWasQuoted = false;
 
-        foreach (var c in commandLine)
+        for (int i = 0; i < commandLine.Length; i++)
         {
+            var c = commandLine[i];
+
             if (inQuote)
             {
+                // Handle escape sequences inside quotes
+                if (c == '\\' && i + 1 < commandLine.Length)
+                {
+                    var next = commandLine[i + 1];
+                    var escaped = GetEscapedChar(next);
+                    if (escaped.HasValue)
+                    {
+                        current.Append(escaped.Value);
+                        i++; // Skip the next character
+                        continue;
+                    }
+                    // Not a recognized escape - treat backslash literally
+                }
+
                 if (c == quoteChar)
                 {
                     inQuote = false;
@@ -377,13 +408,30 @@ public class SandboxShell : ISandboxShell, IShellContext
             {
                 inQuote = true;
                 quoteChar = c;
+                currentWasQuoted = true;
+            }
+            else if (c == '\\' && i + 1 < commandLine.Length)
+            {
+                // Handle escape sequences outside quotes
+                var next = commandLine[i + 1];
+                var escaped = GetEscapedChar(next);
+                if (escaped.HasValue)
+                {
+                    current.Append(escaped.Value);
+                    i++; // Skip the next character
+                    continue;
+                }
+                // Not a recognized escape - treat backslash literally
+                current.Append(c);
             }
             else if (char.IsWhiteSpace(c))
             {
                 if (current.Length > 0)
                 {
                     parts.Add(ExpandVariables(current.ToString()));
+                    wasQuoted.Add(currentWasQuoted);
                     current.Clear();
+                    currentWasQuoted = false;
                 }
             }
             else
@@ -395,9 +443,234 @@ public class SandboxShell : ISandboxShell, IShellContext
         if (current.Length > 0)
         {
             parts.Add(ExpandVariables(current.ToString()));
+            wasQuoted.Add(currentWasQuoted);
         }
 
-        return parts.ToArray();
+        return (parts.ToArray(), wasQuoted.ToArray());
+    }
+
+    /// <summary>
+    /// Returns the character for a recognized escape sequence, or null if not recognized.
+    /// </summary>
+    private static char? GetEscapedChar(char c)
+    {
+        return c switch
+        {
+            'n' => '\n',
+            't' => '\t',
+            'r' => '\r',
+            '\\' => '\\',
+            '"' => '"',
+            '\'' => '\'',
+            ' ' => ' ',
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Expands glob patterns in arguments. Quoted arguments are not expanded.
+    /// </summary>
+    private string[] ExpandGlobs(string[] args, bool[] wasQuoted)
+    {
+        var result = new List<string>();
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            var quoted = i < wasQuoted.Length && wasQuoted[i];
+
+            // Don't expand if quoted or if it's a flag
+            if (quoted || arg.StartsWith("-"))
+            {
+                result.Add(arg);
+                continue;
+            }
+
+            // Check if contains glob characters
+            if (!ContainsGlobChars(arg))
+            {
+                result.Add(arg);
+                continue;
+            }
+
+            // Expand the glob
+            var matches = ExpandGlobPattern(arg);
+            if (matches.Count > 0)
+            {
+                result.AddRange(matches);
+            }
+            else
+            {
+                // No matches - keep original (like bash behavior)
+                result.Add(arg);
+            }
+        }
+
+        return result.ToArray();
+    }
+
+    private static bool ContainsGlobChars(string s)
+    {
+        return s.Contains('*') || s.Contains('?') || s.Contains('[');
+    }
+
+    /// <summary>
+    /// Expands a glob pattern against the virtual filesystem.
+    /// </summary>
+    private List<string> ExpandGlobPattern(string pattern)
+    {
+        var results = new List<string>();
+
+        // Determine base path and pattern
+        string basePath;
+        string globPattern;
+
+        if (pattern.StartsWith("/"))
+        {
+            // Absolute path - find the non-glob prefix
+            var lastSlashBeforeGlob = FindLastSlashBeforeGlob(pattern);
+            if (lastSlashBeforeGlob == 0)
+            {
+                basePath = "/";
+                globPattern = pattern[1..];
+            }
+            else
+            {
+                basePath = pattern[..lastSlashBeforeGlob];
+                globPattern = pattern[(lastSlashBeforeGlob + 1)..];
+            }
+        }
+        else
+        {
+            // Relative path
+            var slashIndex = FindLastSlashBeforeGlob(pattern);
+            if (slashIndex < 0)
+            {
+                basePath = _currentDirectory;
+                globPattern = pattern;
+            }
+            else
+            {
+                var relativePart = pattern[..slashIndex];
+                basePath = ResolvePath(relativePart);
+                globPattern = pattern[(slashIndex + 1)..];
+            }
+        }
+
+        // If pattern contains path separators, we need recursive matching
+        if (globPattern.Contains('/'))
+        {
+            ExpandGlobRecursive(basePath, globPattern.Split('/'), 0, results, pattern.StartsWith("/"));
+        }
+        else
+        {
+            // Simple case - single level glob
+            ExpandGlobSingleLevel(basePath, globPattern, results, pattern.StartsWith("/"));
+        }
+
+        results.Sort();
+        return results;
+    }
+
+    private static int FindLastSlashBeforeGlob(string pattern)
+    {
+        int lastSlash = -1;
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            if (pattern[i] == '/')
+                lastSlash = i;
+            if (pattern[i] == '*' || pattern[i] == '?' || pattern[i] == '[')
+                break;
+        }
+        return lastSlash;
+    }
+
+    private void ExpandGlobSingleLevel(string basePath, string pattern, List<string> results, bool absolute)
+    {
+        if (!_fs.IsDirectory(basePath))
+            return;
+
+        var regex = GlobToRegex(pattern);
+
+        foreach (var name in _fs.ListDirectory(basePath))
+        {
+            if (regex.IsMatch(name))
+            {
+                var fullPath = basePath == "/" ? "/" + name : basePath + "/" + name;
+                // Return relative or absolute based on input
+                if (absolute)
+                {
+                    results.Add(fullPath);
+                }
+                else
+                {
+                    results.Add(GetRelativePath(fullPath));
+                }
+            }
+        }
+    }
+
+    private void ExpandGlobRecursive(string basePath, string[] patternParts, int partIndex, List<string> results, bool absolute)
+    {
+        if (partIndex >= patternParts.Length)
+            return;
+
+        var pattern = patternParts[partIndex];
+        var isLast = partIndex == patternParts.Length - 1;
+
+        if (!_fs.IsDirectory(basePath))
+            return;
+
+        var regex = GlobToRegex(pattern);
+
+        foreach (var name in _fs.ListDirectory(basePath))
+        {
+            if (regex.IsMatch(name))
+            {
+                var fullPath = basePath == "/" ? "/" + name : basePath + "/" + name;
+
+                if (isLast)
+                {
+                    if (absolute)
+                    {
+                        results.Add(fullPath);
+                    }
+                    else
+                    {
+                        results.Add(GetRelativePath(fullPath));
+                    }
+                }
+                else if (_fs.IsDirectory(fullPath))
+                {
+                    ExpandGlobRecursive(fullPath, patternParts, partIndex + 1, results, absolute);
+                }
+            }
+        }
+    }
+
+    private string GetRelativePath(string absolutePath)
+    {
+        if (_currentDirectory == "/")
+        {
+            return absolutePath.TrimStart('/');
+        }
+
+        if (absolutePath.StartsWith(_currentDirectory + "/"))
+        {
+            return absolutePath[(_currentDirectory.Length + 1)..];
+        }
+
+        return absolutePath;
+    }
+
+    private static Regex GlobToRegex(string pattern)
+    {
+        var regexPattern = "^" + Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".")
+            .Replace("\\[", "[")
+            .Replace("\\]", "]") + "$";
+        return new Regex(regexPattern, RegexOptions.Compiled);
     }
 
     /// <summary>
@@ -488,8 +761,15 @@ public class SandboxShell : ISandboxShell, IShellContext
 
     private ShellResult CmdLs(string[] args)
     {
-        var showAll = args.Contains("-a") || args.Contains("-la") || args.Contains("-al");
-        var longFormat = args.Contains("-l") || args.Contains("-la") || args.Contains("-al");
+        var showAll = args.Contains("-a") || args.Contains("-la") || args.Contains("-al") || 
+                      args.Contains("-laR") || args.Contains("-lRa") || args.Contains("-aR") || 
+                      args.Contains("-Ra") || args.Contains("-alR") || args.Contains("-Rla");
+        var longFormat = args.Contains("-l") || args.Contains("-la") || args.Contains("-al") ||
+                         args.Contains("-laR") || args.Contains("-lRa") || args.Contains("-lR") ||
+                         args.Contains("-Rl") || args.Contains("-alR") || args.Contains("-Rla");
+        var recursive = args.Contains("-R") || args.Contains("-laR") || args.Contains("-lRa") ||
+                        args.Contains("-aR") || args.Contains("-Ra") || args.Contains("-lR") ||
+                        args.Contains("-Rl") || args.Contains("-alR") || args.Contains("-Rla");
         var paths = args.Where(a => !a.StartsWith('-')).ToList();
         
         if (paths.Count == 0) paths.Add(".");
@@ -505,33 +785,17 @@ public class SandboxShell : ISandboxShell, IShellContext
                 return ShellResult.Error($"ls: cannot access '{p}': No such file or directory");
             }
 
-            if (_fs.IsDirectory(path))
+            if (recursive)
             {
-                var entries = _fs.ListDirectory(path).ToList();
-                
-                if (!showAll)
+                LsRecursive(path, p, showAll, longFormat, output, paths.Count > 1);
+            }
+            else if (_fs.IsDirectory(path))
+            {
+                if (paths.Count > 1)
                 {
-                    entries = entries.Where(e => !e.StartsWith('.')).ToList();
+                    output.AppendLine($"{p}:");
                 }
-
-                if (longFormat)
-                {
-                    foreach (var entry in entries)
-                    {
-                        var fullPath = path == "/" ? "/" + entry : path + "/" + entry;
-                        var node = _fs.GetEntry(fullPath);
-                        if (node != null)
-                        {
-                            var type = node.IsDirectory ? "d" : "-";
-                            var size = node.IsDirectory ? 0 : node.Content.Length;
-                            output.AppendLine($"{type}rw-r--r--  {size,8}  {node.ModifiedAt:MMM dd HH:mm}  {entry}");
-                        }
-                    }
-                }
-                else
-                {
-                    output.AppendLine(string.Join("  ", entries));
-                }
+                LsDirectory(path, showAll, longFormat, output);
             }
             else
             {
@@ -540,6 +804,64 @@ public class SandboxShell : ISandboxShell, IShellContext
         }
 
         return ShellResult.Ok(output.ToString().TrimEnd());
+    }
+
+    private void LsDirectory(string path, bool showAll, bool longFormat, StringBuilder output)
+    {
+        var entries = _fs.ListDirectory(path).ToList();
+        
+        if (!showAll)
+        {
+            entries = entries.Where(e => !e.StartsWith('.')).ToList();
+        }
+
+        if (longFormat)
+        {
+            foreach (var entry in entries)
+            {
+                var fullPath = path == "/" ? "/" + entry : path + "/" + entry;
+                var node = _fs.GetEntry(fullPath);
+                if (node != null)
+                {
+                    var type = node.IsDirectory ? "d" : "-";
+                    var size = node.IsDirectory ? 0 : node.Content.Length;
+                    output.AppendLine($"{type}rw-r--r--  {size,8}  {node.ModifiedAt:MMM dd HH:mm}  {entry}");
+                }
+            }
+        }
+        else
+        {
+            output.AppendLine(string.Join("  ", entries));
+        }
+    }
+
+    private void LsRecursive(string path, string displayPath, bool showAll, bool longFormat, StringBuilder output, bool showHeader)
+    {
+        if (!_fs.IsDirectory(path))
+        {
+            output.AppendLine(displayPath);
+            return;
+        }
+
+        output.AppendLine($"{displayPath}:");
+        LsDirectory(path, showAll, longFormat, output);
+
+        var entries = _fs.ListDirectory(path).ToList();
+        if (!showAll)
+        {
+            entries = entries.Where(e => !e.StartsWith('.')).ToList();
+        }
+
+        foreach (var entry in entries)
+        {
+            var fullPath = path == "/" ? "/" + entry : path + "/" + entry;
+            if (_fs.IsDirectory(fullPath))
+            {
+                output.AppendLine();
+                var childDisplayPath = displayPath == "." ? entry : $"{displayPath}/{entry}";
+                LsRecursive(fullPath, childDisplayPath, showAll, longFormat, output, true);
+            }
+        }
     }
 
     private ShellResult CmdCat(string[] args)
@@ -630,6 +952,7 @@ public class SandboxShell : ISandboxShell, IShellContext
 
     private ShellResult CmdCp(string[] args)
     {
+        var recursive = args.Contains("-r") || args.Contains("-R");
         var paths = args.Where(a => !a.StartsWith('-')).ToList();
         
         if (paths.Count < 2)
@@ -644,6 +967,9 @@ public class SandboxShell : ISandboxShell, IShellContext
             
             if (!_fs.Exists(srcPath))
                 return ShellResult.Error($"cp: cannot stat '{src}': No such file or directory");
+
+            if (_fs.IsDirectory(srcPath) && !recursive)
+                return ShellResult.Error($"cp: -r not specified; omitting directory '{src}'");
 
             var targetPath = _fs.IsDirectory(dest) 
                 ? dest + "/" + FileSystemPath.GetName(srcPath) 
@@ -805,36 +1131,115 @@ public class SandboxShell : ISandboxShell, IShellContext
 
     private ShellResult CmdGrep(string[] args)
     {
-        if (args.Length < 2)
+        // Parse flags first, then get pattern and files
+        var ignoreCase = false;
+        var showLineNumbers = false;
+        var recursive = false;
+        var nonFlagArgs = new List<string>();
+
+        foreach (var arg in args)
+        {
+            if (arg == "-i")
+                ignoreCase = true;
+            else if (arg == "-n")
+                showLineNumbers = true;
+            else if (arg == "-r" || arg == "-R")
+                recursive = true;
+            else if (arg.StartsWith("-"))
+            {
+                // Check for combined flags like -rn, -in, -rin
+                foreach (var c in arg.Skip(1))
+                {
+                    if (c == 'i') ignoreCase = true;
+                    else if (c == 'n') showLineNumbers = true;
+                    else if (c == 'r' || c == 'R') recursive = true;
+                }
+            }
+            else
+                nonFlagArgs.Add(arg);
+        }
+
+        if (nonFlagArgs.Count < 2)
             return ShellResult.Error("grep: missing pattern or file");
 
-        var pattern = args[0];
-        var paths = args.Skip(1).Where(a => !a.StartsWith('-')).ToList();
-        var ignoreCase = args.Contains("-i");
-        var showLineNumbers = args.Contains("-n");
+        var pattern = nonFlagArgs[0];
+        var inputPaths = nonFlagArgs.Skip(1).ToList();
+
+        // Expand directories if recursive
+        var filePaths = new List<(string DisplayPath, string FullPath)>();
+        foreach (var p in inputPaths)
+        {
+            var path = ResolvePath(p);
+            if (_fs.IsDirectory(path))
+            {
+                if (recursive)
+                {
+                    CollectFilesRecursive(path, p, filePaths);
+                }
+                else
+                {
+                    return ShellResult.Error($"grep: {p}: Is a directory");
+                }
+            }
+            else
+            {
+                filePaths.Add((p, path));
+            }
+        }
 
         var output = new StringBuilder();
         var regexOptions = ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
         var regex = new Regex(pattern, regexOptions);
+        var showPrefix = filePaths.Count > 1;
 
-        foreach (var p in paths)
+        foreach (var (displayPath, fullPath) in filePaths)
         {
-            var path = ResolvePath(p);
-            var content = _fs.ReadFile(path, System.Text.Encoding.UTF8);
-            var lines = content.Split('\n');
-
-            for (int i = 0; i < lines.Length; i++)
+            try
             {
-                if (regex.IsMatch(lines[i]))
+                var content = _fs.ReadFile(fullPath, System.Text.Encoding.UTF8);
+                var lines = content.Split('\n');
+
+                for (int i = 0; i < lines.Length; i++)
                 {
-                    var prefix = paths.Count > 1 ? $"{p}:" : "";
-                    var lineNum = showLineNumbers ? $"{i + 1}:" : "";
-                    output.AppendLine($"{prefix}{lineNum}{lines[i]}");
+                    if (regex.IsMatch(lines[i]))
+                    {
+                        var prefix = showPrefix ? $"{displayPath}:" : "";
+                        var lineNum = showLineNumbers ? $"{i + 1}:" : "";
+                        output.AppendLine($"{prefix}{lineNum}{lines[i]}");
+                    }
                 }
+            }
+            catch (FileNotFoundException)
+            {
+                return ShellResult.Error($"grep: {displayPath}: No such file or directory");
             }
         }
 
         return ShellResult.Ok(output.ToString().TrimEnd());
+    }
+
+    private void CollectFilesRecursive(string path, string displayPath, List<(string DisplayPath, string FullPath)> files)
+    {
+        if (!_fs.IsDirectory(path))
+        {
+            files.Add((displayPath, path));
+            return;
+        }
+
+        foreach (var entry in _fs.ListDirectory(path))
+        {
+            var fullPath = path == "/" ? "/" + entry : path + "/" + entry;
+            var childDisplayPath = displayPath == "." ? entry : $"{displayPath}/{entry}";
+
+            if (_fs.IsDirectory(fullPath))
+            {
+                CollectFilesRecursive(fullPath, childDisplayPath, files);
+            }
+            else
+            {
+                files.Add((childDisplayPath, fullPath));
+            }
+        }
     }
 
     private ShellResult CmdFind(string[] args)

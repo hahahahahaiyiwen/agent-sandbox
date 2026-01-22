@@ -1,4 +1,4 @@
-using AgentSandbox.Core.Mounting;
+using AgentSandbox.Core.Importing;
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
 using AgentSandbox.Core.Telemetry;
@@ -32,13 +32,13 @@ public class SandboxOptions
     public IEnumerable<IShellCommand> ShellExtensions { get; set; } = Array.Empty<IShellCommand>();
 
     /// <summary>
-    /// Files to mount into the sandbox filesystem at initialization.
-    /// Each mount specifies a destination path and file source.
+    /// Files to import into the sandbox filesystem at initialization.
+    /// Each import specifies a destination path and file source.
     /// </summary>
-    public IReadOnlyList<FileMountOptions> Mounts { get; set; } = [];
+    public IReadOnlyList<FileImportOptions> Imports { get; set; } = [];
 
     /// <summary>
-    /// Agent skills configuration. Skills are mounted at initialization.
+    /// Agent skills configuration. Skills are loaded at initialization.
     /// </summary>
     public AgentSkillOptions AgentSkills { get; set; } = new();
 
@@ -59,11 +59,11 @@ public class SandboxOptions
         Environment = new Dictionary<string, string>(Environment),
         WorkingDirectory = WorkingDirectory,
         ShellExtensions = ShellExtensions.ToArray(),
-        Mounts = Mounts.ToArray(),
+        Imports = Imports.ToArray(),
         AgentSkills = new AgentSkillOptions
         {
             Skills = AgentSkills.Skills.ToArray(),
-            MountPath = AgentSkills.MountPath
+            BasePath = AgentSkills.BasePath
         },
         Telemetry = Telemetry
     };

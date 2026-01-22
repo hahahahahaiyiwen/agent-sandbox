@@ -482,4 +482,342 @@ public class SandboxShellTests
     }
 
     #endregion
+
+    #region Glob Expansion Tests
+
+    [Fact]
+    public void GlobExpansion_StarPattern_MatchesFiles()
+    {
+        _fs.WriteFile("/file1.txt", "content1");
+        _fs.WriteFile("/file2.txt", "content2");
+        _fs.WriteFile("/file3.log", "content3");
+
+        var result = _shell.Execute("cat *.txt");
+
+        Assert.True(result.Success);
+        Assert.Contains("content1", result.Stdout);
+        Assert.Contains("content2", result.Stdout);
+        Assert.DoesNotContain("content3", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_QuestionMark_MatchesSingleChar()
+    {
+        _fs.WriteFile("/file1.txt", "one");
+        _fs.WriteFile("/file2.txt", "two");
+        _fs.WriteFile("/file10.txt", "ten");
+
+        var result = _shell.Execute("cat file?.txt");
+
+        Assert.True(result.Success);
+        Assert.Contains("one", result.Stdout);
+        Assert.Contains("two", result.Stdout);
+        Assert.DoesNotContain("ten", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_QuotedPattern_NotExpanded()
+    {
+        _fs.WriteFile("/file1.txt", "content1");
+        _fs.WriteFile("/*.txt", "literal");
+
+        var result = _shell.Execute("cat '*.txt'");
+
+        Assert.True(result.Success);
+        Assert.Equal("literal", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_NoMatches_KeepsPattern()
+    {
+        var result = _shell.Execute("cat *.nonexistent");
+
+        Assert.False(result.Success);
+        Assert.Contains("*.nonexistent", result.Stderr);
+    }
+
+    [Fact]
+    public void GlobExpansion_InSubdirectory()
+    {
+        _fs.WriteFile("/src/app.cs", "app");
+        _fs.WriteFile("/src/util.cs", "util");
+        _fs.WriteFile("/src/readme.md", "readme");
+
+        _shell.Execute("cd /src");
+        var result = _shell.Execute("cat *.cs");
+
+        Assert.True(result.Success);
+        Assert.Contains("app", result.Stdout);
+        Assert.Contains("util", result.Stdout);
+        Assert.DoesNotContain("readme", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_AbsolutePath()
+    {
+        _fs.WriteFile("/data/file1.csv", "csv1");
+        _fs.WriteFile("/data/file2.csv", "csv2");
+
+        var result = _shell.Execute("cat /data/*.csv");
+
+        Assert.True(result.Success);
+        Assert.Contains("csv1", result.Stdout);
+        Assert.Contains("csv2", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_WithGrep()
+    {
+        _fs.WriteFile("/test1.cs", "class Foo {}");
+        _fs.WriteFile("/test2.cs", "class Bar {}");
+        _fs.WriteFile("/test3.txt", "class Baz {}");
+
+        var result = _shell.Execute("grep class *.cs");
+
+        Assert.True(result.Success);
+        Assert.Contains("Foo", result.Stdout);
+        Assert.Contains("Bar", result.Stdout);
+        Assert.DoesNotContain("Baz", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_WithRm()
+    {
+        _fs.WriteFile("/temp1.log", "log1");
+        _fs.WriteFile("/temp2.log", "log2");
+        _fs.WriteFile("/keep.txt", "keep");
+
+        var result = _shell.Execute("rm *.log");
+
+        Assert.True(result.Success);
+        Assert.False(_fs.Exists("/temp1.log"));
+        Assert.False(_fs.Exists("/temp2.log"));
+        Assert.True(_fs.Exists("/keep.txt"));
+    }
+
+    [Fact]
+    public void GlobExpansion_RelativePath()
+    {
+        _fs.WriteFile("/project/src/a.cs", "a");
+        _fs.WriteFile("/project/src/b.cs", "b");
+
+        _shell.Execute("cd /project");
+        var result = _shell.Execute("cat src/*.cs");
+
+        Assert.True(result.Success);
+        Assert.Contains("a", result.Stdout);
+        Assert.Contains("b", result.Stdout);
+    }
+
+    [Fact]
+    public void GlobExpansion_FlagsNotExpanded()
+    {
+        _fs.WriteFile("/-n", "should not match");
+        _fs.WriteFile("/file.txt", "hello world");
+
+        var result = _shell.Execute("grep -n hello file.txt");
+
+        Assert.True(result.Success);
+        Assert.Contains("1:hello world", result.Stdout);
+    }
+
+    #endregion
+
+    #region Escape Sequence Tests
+
+    [Fact]
+    public void EscapeSequence_EscapedQuoteInDoubleQuotes()
+    {
+        var result = _shell.Execute("echo \"say \\\"hello\\\"\"");
+
+        Assert.True(result.Success);
+        Assert.Equal("say \"hello\"", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_EscapedQuoteInSingleQuotes()
+    {
+        var result = _shell.Execute("echo 'it\\'s working'");
+
+        Assert.True(result.Success);
+        Assert.Equal("it's working", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_Newline()
+    {
+        _fs.WriteFile("/test.txt", "line1\\nline2");
+        
+        var result = _shell.Execute("echo \"line1\\nline2\"");
+
+        Assert.True(result.Success);
+        Assert.Equal("line1\nline2", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_Tab()
+    {
+        var result = _shell.Execute("echo \"col1\\tcol2\"");
+
+        Assert.True(result.Success);
+        Assert.Equal("col1\tcol2", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_Backslash()
+    {
+        var result = _shell.Execute("echo \"path\\\\to\\\\file\"");
+
+        Assert.True(result.Success);
+        Assert.Equal("path\\to\\file", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_OutsideQuotes()
+    {
+        var result = _shell.Execute("echo hello\\ world");
+
+        Assert.True(result.Success);
+        Assert.Equal("hello world", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_GrepWithQuotedPattern()
+    {
+        _fs.WriteFile("/test.txt", "case \"grep\" => handler");
+
+        var result = _shell.Execute("grep \"\\\"grep\\\"\" /test.txt");
+
+        Assert.True(result.Success);
+        Assert.Contains("grep", result.Stdout);
+    }
+
+    [Fact]
+    public void EscapeSequence_UnrecognizedEscape_PassedLiterally()
+    {
+        var result = _shell.Execute("echo \"\\x\"");
+
+        Assert.True(result.Success);
+        Assert.Equal("\\x", result.Stdout);
+    }
+
+    #endregion
+
+    #region Recursive Options Tests
+
+    [Fact]
+    public void Ls_Recursive_ListsSubdirectories()
+    {
+        _fs.WriteFile("/project/src/app.cs", "app");
+        _fs.WriteFile("/project/src/util.cs", "util");
+        _fs.WriteFile("/project/tests/test.cs", "test");
+        _fs.WriteFile("/project/README.md", "readme");
+
+        var result = _shell.Execute("ls -R /project");
+
+        Assert.True(result.Success);
+        Assert.Contains("/project:", result.Stdout);
+        Assert.Contains("src", result.Stdout);
+        Assert.Contains("tests", result.Stdout);
+        Assert.Contains("/project/src:", result.Stdout);
+        Assert.Contains("app.cs", result.Stdout);
+        Assert.Contains("/project/tests:", result.Stdout);
+        Assert.Contains("test.cs", result.Stdout);
+    }
+
+    [Fact]
+    public void Ls_Recursive_WithLongFormat()
+    {
+        _fs.WriteFile("/dir/file.txt", "content");
+        _fs.WriteFile("/dir/sub/nested.txt", "nested");
+
+        var result = _shell.Execute("ls -lR /dir");
+
+        Assert.True(result.Success);
+        Assert.Contains("/dir:", result.Stdout);
+        Assert.Contains("file.txt", result.Stdout);
+        Assert.Contains("/dir/sub:", result.Stdout);
+        Assert.Contains("nested.txt", result.Stdout);
+    }
+
+    [Fact]
+    public void Cp_Recursive_CopiesDirectory()
+    {
+        _fs.WriteFile("/src/file1.txt", "content1");
+        _fs.WriteFile("/src/sub/file2.txt", "content2");
+
+        var result = _shell.Execute("cp -r /src /dest");
+
+        Assert.True(result.Success);
+        Assert.True(_fs.Exists("/dest/file1.txt"));
+        Assert.True(_fs.Exists("/dest/sub/file2.txt"));
+        Assert.Equal("content1", _fs.ReadFile("/dest/file1.txt", System.Text.Encoding.UTF8));
+        Assert.Equal("content2", _fs.ReadFile("/dest/sub/file2.txt", System.Text.Encoding.UTF8));
+    }
+
+    [Fact]
+    public void Cp_WithoutRecursive_FailsOnDirectory()
+    {
+        _fs.CreateDirectory("/mydir");
+
+        var result = _shell.Execute("cp /mydir /dest");
+
+        Assert.False(result.Success);
+        Assert.Contains("-r not specified", result.Stderr);
+    }
+
+    [Fact]
+    public void Grep_Recursive_SearchesDirectories()
+    {
+        _fs.WriteFile("/project/src/app.cs", "class MyApp { }");
+        _fs.WriteFile("/project/src/util.cs", "class MyUtil { }");
+        _fs.WriteFile("/project/tests/test.cs", "class MyTest { }");
+        _fs.WriteFile("/project/README.md", "# My Project");
+
+        var result = _shell.Execute("grep -r class /project");
+
+        Assert.True(result.Success);
+        Assert.Contains("app.cs", result.Stdout);
+        Assert.Contains("util.cs", result.Stdout);
+        Assert.Contains("test.cs", result.Stdout);
+        Assert.DoesNotContain("README", result.Stdout);
+    }
+
+    [Fact]
+    public void Grep_Recursive_WithLineNumbers()
+    {
+        _fs.WriteFile("/dir/file1.txt", "line1\nmatch here\nline3");
+        _fs.WriteFile("/dir/file2.txt", "no match");
+
+        var result = _shell.Execute("grep -rn match /dir");
+
+        Assert.True(result.Success);
+        Assert.Contains("file1.txt:2:match here", result.Stdout);
+    }
+
+    [Fact]
+    public void Grep_WithoutRecursive_FailsOnDirectory()
+    {
+        _fs.CreateDirectory("/mydir");
+
+        var result = _shell.Execute("grep pattern /mydir");
+
+        Assert.False(result.Success);
+        Assert.Contains("Is a directory", result.Stderr);
+    }
+
+    [Fact]
+    public void Grep_Recursive_CombinedFlags()
+    {
+        _fs.WriteFile("/src/a.cs", "Hello World");
+        _fs.WriteFile("/src/b.cs", "hello world");
+
+        var result = _shell.Execute("grep -rin hello /src");
+
+        Assert.True(result.Success);
+        Assert.Contains("a.cs:1:Hello World", result.Stdout);
+        Assert.Contains("b.cs:1:hello world", result.Stdout);
+    }
+
+    #endregion
 }

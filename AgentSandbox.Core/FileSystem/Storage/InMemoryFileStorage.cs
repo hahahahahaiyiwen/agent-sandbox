@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO.Compression;
 using System.Text.Json;
 
 namespace AgentSandbox.Core.FileSystem;
@@ -98,16 +99,29 @@ public class InMemoryFileStorage : IFileStorage, ISerializableFileStorage
     /// <inheritdoc />
     public byte[] Serialize()
     {
-        return JsonSerializer.SerializeToUtf8Bytes(_store, new JsonSerializerOptions
+        var json = JsonSerializer.SerializeToUtf8Bytes(_store, new JsonSerializerOptions
         {
             WriteIndented = false
         });
+
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal))
+        {
+            gzip.Write(json);
+        }
+        return output.ToArray();
     }
 
     /// <inheritdoc />
     public void Deserialize(byte[] data)
     {
-        var snapshot = JsonSerializer.Deserialize<Dictionary<string, FileEntry>>(data);
+        using var input = new MemoryStream(data);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        var json = output.ToArray();
+
+        var snapshot = JsonSerializer.Deserialize<Dictionary<string, FileEntry>>(json);
         if (snapshot == null) return;
 
         _store.Clear();

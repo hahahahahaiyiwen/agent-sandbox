@@ -1,7 +1,7 @@
-namespace AgentSandbox.Core.Mounting;
+namespace AgentSandbox.Core.Importing;
 
 /// <summary>
-/// Represents a file to be mounted into the sandbox filesystem.
+/// Represents a file to be imported into the sandbox filesystem.
 /// </summary>
 public class FileData
 {

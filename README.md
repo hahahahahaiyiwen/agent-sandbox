@@ -7,7 +7,7 @@ An in-memory agent sandbox with virtual filesystem and command-line interface fo
 - **In-Memory Virtual Filesystem**: Full POSIX-like filesystem that never touches disk
 - **Sandboxed Shell**: Unix-style CLI emulator with 18+ built-in commands
 - **Shell Extensions**: Extensible command system with `curl`, `jq`, `git` and more
-- **Agent Skill Integration**: Easy mounting of reusable agent skills into the sandbox filesystem 
+- **Agent Skill Integration**: Easy loading of reusable agent skills into the sandbox filesystem 
 - **Self-Discovery Support**: Enhanced documentation via `help` and `<command> -h` to enable agent's self-discovery
 - **Snapshots**: Save and restore complete sandbox state
 - **Resource Limits**: Configurable max file size, total storage, and node count
@@ -66,7 +66,7 @@ Navigate to `http://localhost:5000/swagger` to explore the API.
 dotnet add package AgentSandbox.Core
 
 # Or install a specific version
-dotnet add package AgentSandbox.Core --version 1.3.0
+dotnet add package AgentSandbox.Core --version 2.0.0
 ```
 
 ```csharp

@@ -1,10 +1,10 @@
 using System.Reflection;
 
-namespace AgentSandbox.Core.Mounting;
+namespace AgentSandbox.Core.Importing;
 
 /// <summary>
 /// Loads files from embedded resources in an assembly.
-/// Can be used for mounting any files (skills, data, templates, etc.) into the sandbox.
+/// Can be used for importing any files (skills, data, templates, etc.) into the sandbox.
 /// </summary>
 public class EmbeddedSource : IFileSource
 {

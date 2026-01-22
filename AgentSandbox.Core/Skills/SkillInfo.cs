@@ -1,7 +1,7 @@
 namespace AgentSandbox.Core.Skills;
 
 /// <summary>
-/// Runtime information about a skill mounted in the sandbox.
+/// Runtime information about a skill loaded in the sandbox.
 /// </summary>
 public class SkillInfo
 {
@@ -16,9 +16,9 @@ public class SkillInfo
     public required string Description { get; init; }
 
     /// <summary>
-    /// Mount path in the virtual filesystem (e.g., /.sandbox/skills/my-skill).
+    /// Path in the virtual filesystem (e.g., /.sandbox/skills/my-skill).
     /// </summary>
-    public required string MountPath { get; init; }
+    public required string Path { get; init; }
 
     /// <summary>
     /// Parsed metadata from SKILL.md.

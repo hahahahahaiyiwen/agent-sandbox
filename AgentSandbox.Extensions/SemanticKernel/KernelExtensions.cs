@@ -54,7 +54,7 @@ public static class KernelExtensions
     /// Creates an AIFunction for retrieving skill information.
     /// The function description dynamically includes all available skills.
     /// </summary>
-    /// <param name="sandbox">The sandbox instance with mounted skills.</param>
+    /// <param name="sandbox">The sandbox instance with loaded skills.</param>
     /// <returns>An AIFunction that retrieves skill information.</returns>
     public static AIFunction CreateGetSkillFunction(Sandbox sandbox)
     {

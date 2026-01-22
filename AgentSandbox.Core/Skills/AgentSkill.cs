@@ -1,10 +1,10 @@
-using AgentSandbox.Core.Mounting;
+using AgentSandbox.Core.Importing;
 using System.Reflection;
 
 namespace AgentSandbox.Core.Skills;
 
 /// <summary>
-/// Represents an agent skill to be mounted into the sandbox filesystem.
+/// Represents an agent skill to be loaded into the sandbox filesystem.
 /// Skills are folders containing SKILL.md (required), scripts/, references/, and assets/.
 /// </summary>
 public class AgentSkill

@@ -41,14 +41,14 @@ var options = new SandboxOptions
 var sandbox = new Sandbox("agent-1", options);
 ```
 
-## Mounting Files
+## Importing Files
 
 ```csharp
 var options = new SandboxOptions
 {
-    Mounts = [
-        new FileMountOptions { Path = "/data", Source = new FileSystemSource("C:/my-data") },
-        new FileMountOptions { Path = "/config", Source = new InMemorySource()
+    Imports = [
+        new FileImportOptions { Path = "/data", Source = new FileSystemSource("C:/my-data") },
+        new FileImportOptions { Path = "/config", Source = new InMemorySource()
             .AddFile("settings.json", """{"debug": true}""") }
     ]
 };
@@ -56,7 +56,7 @@ var options = new SandboxOptions
 
 ## Agent Skills
 
-Mount [agentskills.io](https://agentskills.io) compatible skill packages:
+Load [agentskills.io](https://agentskills.io) compatible skill packages:
 
 ```csharp
 var options = new SandboxOptions
@@ -76,7 +76,7 @@ var options = new SandboxOptions
 var sandbox = new Sandbox(options: options);
 
 // Access skill instructions
-var skills = sandbox.GetMountedSkills();
+var skills = sandbox.GetSkills();
 Console.WriteLine(skills[0].Metadata.Instructions);
 
 // Execute skill scripts

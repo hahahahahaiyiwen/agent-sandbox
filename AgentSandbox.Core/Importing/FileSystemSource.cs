@@ -1,8 +1,8 @@
-namespace AgentSandbox.Core.Mounting;
+namespace AgentSandbox.Core.Importing;
 
 /// <summary>
 /// Loads files from a local filesystem directory.
-/// Can be used for mounting any files (skills, data, templates, etc.) into the sandbox.
+/// Can be used for importing any files (skills, data, templates, etc.) into the sandbox.
 /// </summary>
 public class FileSystemSource : IFileSource
 {

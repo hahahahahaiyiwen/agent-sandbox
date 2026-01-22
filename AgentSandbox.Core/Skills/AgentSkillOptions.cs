@@ -1,18 +1,18 @@
 namespace AgentSandbox.Core.Skills;
 
 /// <summary>
-/// Configuration options for agent skills mounting.
+/// Configuration options for agent skills.
 /// </summary>
 public class AgentSkillOptions
 {
     /// <summary>
-    /// Agent skills to mount into the sandbox filesystem.
-    /// Skills are copied to {MountPath}/{name}/ at initialization.
+    /// Agent skills to load into the sandbox filesystem.
+    /// Skills are copied to {BasePath}/{name}/ at initialization.
     /// </summary>
     public IReadOnlyList<AgentSkill> Skills { get; set; } = [];
 
     /// <summary>
-    /// Base path where skills are mounted. Default: /.sandbox/skills
+    /// Base path where skills are installed. Default: /.sandbox/skills
     /// </summary>
-    public string MountPath { get; set; } = "/.sandbox/skills";
+    public string BasePath { get; set; } = "/.sandbox/skills";
 }

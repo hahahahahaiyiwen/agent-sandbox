@@ -77,5 +77,5 @@ while (true)
     var stats = sandbox.GetStats();
 
     Console.WriteLine("================================");
-    Console.WriteLine("Stats: " + stats.CommandCount + " commands executed, " + stats.FileCount + " files created.");
+    Console.WriteLine("Stats: " + stats.CommandCount + " commands executed, " + stats.FileCount + " files created, " + stats.TotalSize + " bytes total.");
 }

@@ -1,5 +1,5 @@
 using AgentSandbox.Core;
-using AgentSandbox.Core.Mounting;
+using AgentSandbox.Core.Importing;
 using AgentSandbox.Core.Skills;
 
 namespace AgentSandbox.Tests;
@@ -10,7 +10,7 @@ public class AgentSkillsTests
         AppContext.BaseDirectory, "..", "..", "..", "TestSkills");
 
     [Fact]
-    public void Sandbox_WithNoSkills_HasEmptyMountedSkills()
+    public void Sandbox_WithNoSkills_HasEmptyLoadedSkills()
     {
         var sandbox = new Sandbox();
         
@@ -18,7 +18,7 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void Sandbox_MountsSkillToVirtualFs()
+    public void Sandbox_LoadsSkillToVirtualFs()
     {
         var skillPath = Path.Combine(TestSkillsPath, "test-skill");
         var options = new SandboxOptions
@@ -28,11 +28,11 @@ public class AgentSkillsTests
 
         var sandbox = new Sandbox(options: options);
 
-        // Verify skill is mounted
+        // Verify skill is loaded
         var skills = sandbox.GetSkills();
         Assert.Single(skills);
         Assert.Equal("test-skill", skills[0].Name);
-        Assert.Equal("/.sandbox/skills/test-skill", skills[0].MountPath);
+        Assert.Equal("/.sandbox/skills/test-skill", skills[0].Path);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void Sandbox_MountsMultipleSkills()
+    public void Sandbox_LoadsMultipleSkills()
     {
         var skillPath = Path.Combine(TestSkillsPath, "test-skill");
         
@@ -153,14 +153,14 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void Sandbox_CustomSkillsMountPath()
+    public void Sandbox_CustomSkillsBasePath()
     {
         var skillPath = Path.Combine(TestSkillsPath, "test-skill");
         var options = new SandboxOptions
         {
             AgentSkills = new AgentSkillOptions
             {
-                MountPath = "/custom/skills",
+                BasePath = "/custom/skills",
                 Skills = [AgentSkill.FromPath(skillPath)]
             }
         };
@@ -168,7 +168,7 @@ public class AgentSkillsTests
         var sandbox = new Sandbox(options: options);
 
         var skill = sandbox.GetSkills()[0];
-        Assert.Equal("/custom/skills/test-skill", skill.MountPath);
+        Assert.Equal("/custom/skills/test-skill", skill.Path);
 
         var result = sandbox.Execute("cat /custom/skills/test-skill/SKILL.md");
         Assert.True(result.Success);
@@ -191,14 +191,14 @@ public class AgentSkillsTests
             AgentSkills = new AgentSkillOptions
             {
                 Skills = [skill1, skill2],
-                MountPath = "/custom/path"
+                BasePath = "/custom/path"
             }
         };
 
         var clone = options.Clone();
 
         Assert.Equal(2, clone.AgentSkills.Skills.Count);
-        Assert.Equal("/custom/path", clone.AgentSkills.MountPath);
+        Assert.Equal("/custom/path", clone.AgentSkills.BasePath);
         Assert.NotSame(options.AgentSkills.Skills, clone.AgentSkills.Skills);
     }
 
@@ -233,8 +233,8 @@ public class AgentSkillsTests
         var options = new SandboxOptions { AgentSkills = new AgentSkillOptions { Skills = [skill] } };
         var sandbox = new Sandbox(options: options);
 
-        var mounted = sandbox.GetSkills()[0];
-        Assert.Equal("override-name", mounted.Name);
+        var loaded = sandbox.GetSkills()[0];
+        Assert.Equal("override-name", loaded.Name);
     }
 
     [Fact]
@@ -300,7 +300,7 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void Sandbox_MountFiles_MountsFilesToPath()
+    public void Sandbox_ImportFiles_ImportsFilesToPath()
     {
         var source = new InMemorySource()
             .AddFile("config.json", """{"key": "value"}""")
@@ -308,7 +308,7 @@ public class AgentSkillsTests
 
         var options = new SandboxOptions
         {
-            Mounts = [new FileMountOptions { Path = "/data", Source = source }]
+            Imports = [new FileImportOptions { Path = "/data", Source = source }]
         };
         var sandbox = new Sandbox(options: options);
 
@@ -322,22 +322,22 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void Sandbox_MountFiles_FromFileSystem()
+    public void Sandbox_ImportFiles_FromFileSystem()
     {
         var skillPath = Path.Combine(TestSkillsPath, "test-skill");
         var options = new SandboxOptions
         {
-            Mounts = [new FileMountOptions { Path = "/mounted", Source = new FileSystemSource(skillPath) }]
+            Imports = [new FileImportOptions { Path = "/imported", Source = new FileSystemSource(skillPath) }]
         };
         var sandbox = new Sandbox(options: options);
 
-        var result = sandbox.Execute("cat /mounted/SKILL.md");
+        var result = sandbox.Execute("cat /imported/SKILL.md");
         Assert.True(result.Success);
         Assert.Contains("test-skill", result.Stdout);
     }
 
     [Fact]
-    public void Sandbox_MountFiles_NormalizesPath()
+    public void Sandbox_ImportFiles_NormalizesPath()
     {
         var source = new InMemorySource()
             .AddFile("test.txt", "hello");
@@ -345,7 +345,7 @@ public class AgentSkillsTests
         // Path without leading slash
         var options = new SandboxOptions
         {
-            Mounts = [new FileMountOptions { Path = "data", Source = source }]
+            Imports = [new FileImportOptions { Path = "data", Source = source }]
         };
         var sandbox = new Sandbox(options: options);
 
@@ -355,18 +355,18 @@ public class AgentSkillsTests
     }
 
     [Fact]
-    public void SandboxOptions_Clone_IncludesMounts()
+    public void SandboxOptions_Clone_IncludesImports()
     {
         var source = new InMemorySource().AddFile("test.txt", "hello");
         var options = new SandboxOptions
         {
-            Mounts = [new FileMountOptions { Path = "/data", Source = source }]
+            Imports = [new FileImportOptions { Path = "/data", Source = source }]
         };
 
         var clone = options.Clone();
 
-        Assert.Single(clone.Mounts);
-        Assert.Equal("/data", clone.Mounts[0].Path);
-        Assert.NotSame(options.Mounts, clone.Mounts);
+        Assert.Single(clone.Imports);
+        Assert.Equal("/data", clone.Imports[0].Path);
+        Assert.NotSame(options.Imports, clone.Imports);
     }
 }

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using AgentSandbox.Core.FileSystem;
-using AgentSandbox.Core.Mounting;
+using AgentSandbox.Core.Importing;
 using AgentSandbox.Core.Shell;
 using AgentSandbox.Core.Skills;
 using AgentSandbox.Core.Telemetry;
@@ -17,7 +17,7 @@ public class Sandbox : IDisposable, IObservableSandbox
     private readonly SandboxShell _shell;
     private readonly SandboxOptions _options;
     private readonly List<ShellResult> _commandHistory = new();
-    private readonly List<SkillInfo> _mountedSkills = new();
+    private readonly List<SkillInfo> _loadedSkills = new();
     private readonly List<ISandboxObserver> _observers = new();
     private readonly object _observerLock = new();
     private readonly Action<string>? _onDisposed;
@@ -89,11 +89,11 @@ public class Sandbox : IDisposable, IObservableSandbox
             _shell.RegisterCommand(cmd);
         }
 
-        // Mount files
-        MountFiles();
+        // Import files
+        ImportFiles();
 
-        // Mount agent skills
-        MountSkills();
+        // Load agent skills
+        LoadSkills();
 
         // Emit lifecycle event
         if (TelemetryEnabled)
@@ -103,17 +103,17 @@ public class Sandbox : IDisposable, IObservableSandbox
     }
 
     /// <summary>
-    /// Gets information about all mounted skills.
+    /// Gets information about all loaded skills.
     /// </summary>
-    public IReadOnlyList<SkillInfo> GetSkills() => _mountedSkills.AsReadOnly();
+    public IReadOnlyList<SkillInfo> GetSkills() => _loadedSkills.AsReadOnly();
 
     /// <summary>
-    /// Gets a description of mounted skills for use in AI function descriptions.
+    /// Gets a description of loaded skills for use in AI function descriptions.
     /// Uses the XML format recommended by agentskills.io specification.
     /// </summary>
     public string GetSkillsDescription()
     {
-        if (_mountedSkills.Count == 0)
+        if (_loadedSkills.Count == 0)
         {
             return "No skills are currently available.";
         }
@@ -121,12 +121,12 @@ public class Sandbox : IDisposable, IObservableSandbox
         var sb = new StringBuilder();
         sb.AppendLine("<available_skills>");
 
-        foreach (var skill in _mountedSkills)
+        foreach (var skill in _loadedSkills)
         {
             sb.AppendLine("  <skill>");
             sb.AppendLine($"    <name>{skill.Name}</name>");
             sb.AppendLine($"    <description>{skill.Description}</description>");
-            sb.AppendLine($"    <location>{skill.MountPath}/SKILL.md</location>");
+            sb.AppendLine($"    <location>{skill.Path}/SKILL.md</location>");
             sb.AppendLine("  </skill>");
         }
 
@@ -135,21 +135,21 @@ public class Sandbox : IDisposable, IObservableSandbox
         return sb.ToString();
     }
     
-    private void MountSkills()
+    private void LoadSkills()
     {
         if (_options.AgentSkills.Skills.Count == 0) return;
 
         // Create skills base directory
-        _fileSystem.CreateDirectory(_options.AgentSkills.MountPath);
+        _fileSystem.CreateDirectory(_options.AgentSkills.BasePath);
 
         foreach (var skill in _options.AgentSkills.Skills)
         {
-            var skillInfo = MountSkill(skill);
-            _mountedSkills.Add(skillInfo);
+            var skillInfo = LoadSkill(skill);
+            _loadedSkills.Add(skillInfo);
         }
     }
 
-    private SkillInfo MountSkill(AgentSkill skill)
+    private SkillInfo LoadSkill(AgentSkill skill)
     {
         // Get all files from the skill source
         var files = skill.Source.GetFiles().ToList();
@@ -167,30 +167,30 @@ public class Sandbox : IDisposable, IObservableSandbox
 
         // Use name from AgentSkill if provided, otherwise from SKILL.md
         var skillName = skill.Name ?? metadata.Name;
-        var mountPath = $"{_options.AgentSkills.MountPath}/{skillName}";
+        var skillPath = $"{_options.AgentSkills.BasePath}/{skillName}";
 
-        // Mount files to the path
-        MountFilesInternal(mountPath, files);
+        // Copy files to the path
+        CopyFilesInternal(skillPath, files);
 
         return new SkillInfo
         {
             Name = skillName,
             Description = metadata.Description,
-            MountPath = mountPath,
+            Path = skillPath,
             Metadata = metadata
         };
     }
 
-    private void MountFiles()
+    private void ImportFiles()
     {
-        foreach (var mount in _options.Mounts)
+        foreach (var import in _options.Imports)
         {
-            var files = mount.Source.GetFiles().ToList();
-            MountFilesInternal(mount.Path, files);
+            var files = import.Source.GetFiles().ToList();
+            CopyFilesInternal(import.Path, files);
         }
     }
 
-    private void MountFilesInternal(string destPath, IReadOnlyList<FileData> files)
+    private void CopyFilesInternal(string destPath, IReadOnlyList<FileData> files)
     {
         // Normalize path
         if (!destPath.StartsWith("/"))
@@ -198,7 +198,7 @@ public class Sandbox : IDisposable, IObservableSandbox
             destPath = "/" + destPath;
         }
 
-        // Create mount directory
+        // Create destination directory
         _fileSystem.CreateDirectory(destPath);
 
         // Copy all files to virtual filesystem

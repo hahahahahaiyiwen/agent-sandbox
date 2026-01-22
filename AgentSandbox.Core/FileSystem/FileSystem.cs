@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
@@ -479,7 +480,7 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
             return serializable.Serialize();
         }
         
-        // Fallback: serialize via GetAll
+        // Fallback: serialize via GetAll with GZip compression
         var snapshot = _storage.GetAll()
             .ToDictionary(
                 kvp => kvp.Key,
@@ -494,10 +495,17 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
                     Mode = kvp.Value.Mode
                 });
         
-        return JsonSerializer.SerializeToUtf8Bytes(snapshot, new JsonSerializerOptions
+        var json = JsonSerializer.SerializeToUtf8Bytes(snapshot, new JsonSerializerOptions
         {
             WriteIndented = false
         });
+
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal))
+        {
+            gzip.Write(json);
+        }
+        return output.ToArray();
     }
     
     /// <inheritdoc />
@@ -509,8 +517,14 @@ public class FileSystem : IFileSystem, ISnapshotableFileSystem, IFileSystemStats
             return;
         }
         
-        // Fallback: deserialize and populate storage
-        var snapshot = JsonSerializer.Deserialize<Dictionary<string, FileEntry>>(snapshotData);
+        // Fallback: decompress and deserialize
+        using var input = new MemoryStream(snapshotData);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        var json = output.ToArray();
+
+        var snapshot = JsonSerializer.Deserialize<Dictionary<string, FileEntry>>(json);
         if (snapshot == null) return;
 
         lock (_lock)
