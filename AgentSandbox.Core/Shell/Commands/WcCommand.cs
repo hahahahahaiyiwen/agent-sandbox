@@ -25,15 +25,15 @@ public class WcCommand : IShellCommand
         {
             var path = context.ResolvePath(p);
             var content = context.FileSystem.ReadFile(path, Encoding.UTF8);
-            var bytes = context.FileSystem.ReadFile(path, Encoding.UTF8);
+            var byteCount = Encoding.UTF8.GetByteCount(content);
             
             var lines = content.Count(c => c == '\n');
             var words = content.Split(new[] { ' ', '\n', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
             
-            output.AppendLine($"  {lines,6}  {words,6}  {bytes.Length,6} {p}");
+            output.AppendLine($"  {lines,6}  {words,6}  {byteCount,6} {p}");
             totalLines += lines;
             totalWords += words;
-            totalBytes += bytes.Length;
+            totalBytes += byteCount;
         }
 
         if (paths.Count > 1)

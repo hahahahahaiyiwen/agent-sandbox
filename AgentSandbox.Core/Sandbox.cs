@@ -40,7 +40,12 @@ public class Sandbox : IDisposable, IObservableSandbox
     /// </summary>
     public SandboxOptions Options => _options.Clone();
 
-    public Sandbox(string? id = null, SandboxOptions? options = null, Action<string>? onDisposed = null)
+    public Sandbox(string? id = null, SandboxOptions? options = null)
+        : this(id, options, null)
+    {
+    }
+
+    internal Sandbox(string? id, SandboxOptions? options, Action<string>? onDisposed)
     {
         Id = id ?? Guid.NewGuid().ToString("N")[..12];
         _options = options ?? new SandboxOptions();
@@ -526,30 +531,4 @@ public class Sandbox : IDisposable, IObservableSandbox
         
         GC.SuppressFinalize(this);
     }
-}
-
-/// <summary>
-/// Snapshot of sandbox state for persistence/restoration.
-/// </summary>
-public class SandboxSnapshot
-{
-    public string Id { get; set; } = string.Empty;
-    public byte[] FileSystemData { get; set; } = Array.Empty<byte>();
-    public string CurrentDirectory { get; set; } = "/";
-    public Dictionary<string, string> Environment { get; set; } = new();
-    public DateTime CreatedAt { get; set; }
-}
-
-/// <summary>
-/// Runtime statistics for a sandbox.
-/// </summary>
-public class SandboxStats
-{
-    public string Id { get; set; } = string.Empty;
-    public int FileCount { get; set; }
-    public long TotalSize { get; set; }
-    public int CommandCount { get; set; }
-    public string CurrentDirectory { get; set; } = "/";
-    public DateTime CreatedAt { get; set; }
-    public DateTime LastActivityAt { get; set; }
 }

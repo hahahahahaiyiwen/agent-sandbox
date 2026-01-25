@@ -45,8 +45,6 @@ public class SandboxShell : IShellContext
     {
         _fs = fileSystem;
         
-        _environment["HOME"] = "/home";
-        _environment["PATH"] = "/bin:/usr/bin";
         _environment["PWD"] = _currentDirectory;
 
         // Register built-in commands
@@ -262,17 +260,6 @@ public class SandboxShell : IShellContext
         foreach (var alias in command.Aliases)
         {
             _extensionCommands[alias.ToLowerInvariant()] = command;
-        }
-    }
-
-    /// <summary>
-    /// Registers multiple shell command extensions.
-    /// </summary>
-    public void RegisterCommands(IEnumerable<IShellCommand> commands)
-    {
-        foreach (var command in commands)
-        {
-            RegisterCommand(command);
         }
     }
 
