@@ -95,6 +95,18 @@ sandbox.Execute("sh /.sandbox/skills/python-dev/scripts/setup.sh");
 | `sh` | Script execution |
 | `help` | List commands (`<cmd> -h` for details) |
 
+**Shell Features:**
+- Output redirection: `>` (write) and `>>` (append)
+- Environment variables: `$VAR`, `$HOME`
+- Glob patterns: `*.txt`, `src/**/*.cs`
+- Shell scripts: `sh script.sh` or `./script.sh`
+
+**Not Supported:**
+- Pipelines (`|`) - use file arguments instead: `grep pattern file.txt`
+- Input redirection (`<`, `<<`) - pass files as arguments
+- Background jobs (`&`)
+- Command substitution (`` `cmd` `` or `$(cmd)`)
+
 ## Snapshots
 
 ```csharp

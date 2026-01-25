@@ -102,7 +102,7 @@ var sandbox = new Sandbox(options: options);
 
 // Now available in shell
 sandbox.Execute("curl https://api.example.com/data");
-sandbox.Execute("echo '{\"name\":\"test\"}' | jq '.name'");
+sandbox.Execute("echo '{\"name\":\"test\"}'");
 sandbox.Execute("git init");
 ```
 

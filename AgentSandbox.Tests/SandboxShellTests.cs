@@ -31,7 +31,7 @@ public class SandboxShellTests
         var result = _shell.Execute("cd /mydir");
         
         Assert.True(result.Success);
-        Assert.Equal("/mydir", _shell.CurrentDirectory);
+        Assert.Equal("/mydir", ((IShellContext)_shell).CurrentDirectory);
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public class SandboxShellTests
     {
         _shell.Execute("export MY_VAR=my_value");
         
-        Assert.Equal("my_value", _shell.Environment["MY_VAR"]);
+        Assert.Equal("my_value", ((IShellContext)_shell).Environment["MY_VAR"]);
     }
 
     [Fact]

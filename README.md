@@ -356,6 +356,20 @@ curl "http://localhost:5000/api/sandbox/agent-1/ls?path=/workspace"
 | `sh` | Execute shell script | `sh script.sh arg1 arg2` |
 | `help` | Show available commands | `help` |
 
+**Shell Features:**
+
+| Feature | Supported | Notes |
+|---------|-----------|-------|
+| Output redirection (`>`, `>>`) | ✅ | `echo "text" > file.txt` |
+| Environment variables | ✅ | `$VAR`, `$HOME`, `$PWD` |
+| Glob patterns | ✅ | `*.txt`, `src/*.js` |
+| Shell scripts | ✅ | `sh script.sh` or `./script.sh` |
+| Command chaining (`&&`) | ✅ | `mkdir dir && cd dir` |
+| Pipelines (`\|`) | ❌ | Use file arguments instead |
+| Input redirection (`<`, `<<`) | ❌ | Pass files as arguments |
+| Background jobs (`&`) | ❌ | Not applicable |
+| Command substitution | ❌ | `` `cmd` `` and `$(cmd)` not supported |
+
 **Shell Script Execution:**
 
 The `sh` command executes shell scripts with support for:
