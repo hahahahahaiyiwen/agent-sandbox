@@ -353,6 +353,7 @@ curl "http://localhost:5000/api/sandbox/agent-1/ls?path=/workspace"
 | `find` | Find files | `find /path -name "*.txt"` |
 | `env` | Show environment | `env` |
 | `export` | Set environment variable | `export KEY=value` |
+| `clear` | Clear screen | `clear` |
 | `sh` | Execute shell script | `sh script.sh arg1 arg2` |
 | `help` | Show available commands | `help` |
 
@@ -364,7 +365,7 @@ curl "http://localhost:5000/api/sandbox/agent-1/ls?path=/workspace"
 | Environment variables | ✅ | `$VAR`, `$HOME`, `$PWD` |
 | Glob patterns | ✅ | `*.txt`, `src/*.js` |
 | Shell scripts | ✅ | `sh script.sh` or `./script.sh` |
-| Command chaining (`&&`) | ✅ | `mkdir dir && cd dir` |
+| Command chaining (`&&`) | ❌ | Run sequential commands in separate calls or scripts |
 | Pipelines (`\|`) | ❌ | Use file arguments instead |
 | Input redirection (`<`, `<<`) | ❌ | Pass files as arguments |
 | Background jobs (`&`) | ❌ | Not applicable |

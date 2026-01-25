@@ -92,6 +92,7 @@ sandbox.Execute("sh /.sandbox/skills/python-dev/scripts/setup.sh");
 | `mkdir`, `touch`, `rm`, `cp`, `mv` | File management |
 | `echo`, `grep`, `find`, `wc` | Text processing |
 | `env`, `export` | Environment variables |
+| `clear` | Clear screen |
 | `sh` | Script execution |
 | `help` | List commands (`<cmd> -h` for details) |
 
@@ -116,6 +117,21 @@ var snapshot = sandbox.CreateSnapshot();
 // Restore later
 sandbox.RestoreSnapshot(snapshot);
 ```
+
+## History and Observability
+
+```csharp
+// Inspect command history
+var history = sandbox.GetHistory();
+
+// Build an AI tool description for the sandbox
+var toolDescription = sandbox.GetToolDescription();
+
+// Subscribe to sandbox events (commands, files, lifecycle)
+using var subscription = sandbox.Subscribe(myObserver);
+```
+
+Telemetry hooks live in `AgentSandbox.Core.Telemetry` and are configured via `SandboxOptions.Telemetry`.
 
 ## Thread Safety
 
