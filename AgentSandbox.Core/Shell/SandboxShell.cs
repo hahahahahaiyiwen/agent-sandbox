@@ -92,6 +92,35 @@ public class SandboxShell : IShellContext
                 "  - Execute commands separately and process output programmatically\n" +
                 "  - Use shell scripts (.sh) to sequence commands");
         }
+        
+        // Check for command chaining (not supported)
+        var andIndex = FindUnquotedOperator(commandLine, "&&");
+        if (andIndex >= 0)
+        {
+            return ShellResult.Error(
+                "Command chaining (&&) is not supported. Workarounds:\n" +
+                "  - Execute commands separately and check results\n" +
+                "  - Use shell scripts (.sh) to sequence commands");
+        }
+        
+        // Check for background jobs (not supported)
+        var backgroundIndex = FindUnquotedOperator(commandLine, "&");
+        if (backgroundIndex >= 0 && (backgroundIndex + 1 >= commandLine.Length || commandLine[backgroundIndex + 1] != '&'))
+        {
+            return ShellResult.Error(
+                "Background jobs (&) are not supported. Workarounds:\n" +
+                "  - Execute commands sequentially\n" +
+                "  - Use shell scripts (.sh) to sequence commands");
+        }
+        
+        // Check for command substitution (not supported)
+        if (ContainsUnquotedSubstitution(commandLine) || ContainsUnquotedBackticks(commandLine))
+        {
+            return ShellResult.Error(
+                "Command substitution is not supported. Workarounds:\n" +
+                "  - Execute commands separately and pass outputs explicitly\n" +
+                "  - Use shell scripts (.sh) to sequence commands");
+        }
 
         // Check for input redirection (not supported)
         var heredocIndex = FindUnquotedOperator(commandLine, "<<");
@@ -221,7 +250,10 @@ public class SandboxShell : IShellContext
         }
         else
         {
-            result = ShellResult.Error($"{cmdLower}: command not found", 127);
+            result = ShellResult.Error(
+                $"{cmdLower}: command not found.\n" +
+                "Use 'help' to list available commands.",
+                127);
         }
 
         // Handle output redirection
@@ -432,6 +464,82 @@ public class SandboxShell : IShellContext
         }
 
         return -1;
+    }
+    
+    private static bool ContainsUnquotedSubstitution(string commandLine)
+    {
+        var inQuote = false;
+        var quoteChar = '\0';
+        
+        for (int i = 0; i < commandLine.Length - 1; i++)
+        {
+            var c = commandLine[i];
+            
+            if (inQuote)
+            {
+                if (c == quoteChar) inQuote = false;
+                if (c == '\\' && i + 1 < commandLine.Length) i++;
+                continue;
+            }
+            
+            if (c == '"' || c == '\'')
+            {
+                inQuote = true;
+                quoteChar = c;
+                continue;
+            }
+            
+            if (c == '\\' && i + 1 < commandLine.Length)
+            {
+                i++;
+                continue;
+            }
+            
+            if (c == '$' && commandLine[i + 1] == '(')
+            {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    private static bool ContainsUnquotedBackticks(string commandLine)
+    {
+        var inQuote = false;
+        var quoteChar = '\0';
+        
+        for (int i = 0; i < commandLine.Length; i++)
+        {
+            var c = commandLine[i];
+            
+            if (inQuote)
+            {
+                if (c == quoteChar) inQuote = false;
+                if (c == '\\' && i + 1 < commandLine.Length) i++;
+                continue;
+            }
+            
+            if (c == '"' || c == '\'')
+            {
+                inQuote = true;
+                quoteChar = c;
+                continue;
+            }
+            
+            if (c == '\\' && i + 1 < commandLine.Length)
+            {
+                i++;
+                continue;
+            }
+            
+            if (c == '`')
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     private string ExpandVariables(string text)
