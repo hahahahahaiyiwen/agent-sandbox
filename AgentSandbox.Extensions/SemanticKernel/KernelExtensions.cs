@@ -46,7 +46,7 @@ public static class KernelExtensions
                 }
                 return $"Error: {result.Stderr}";
             },
-            name: "Execute",
+            name: "bash_shell",
             description: sandbox.GetToolDescription());
     }
 
@@ -60,7 +60,7 @@ public static class KernelExtensions
     {
         return AIFunctionFactory.Create(
             (string skillName) => GetSkillImplementation(sandbox, skillName),
-            name: "GetSkill",
+            name: "get_skill",
             description: sandbox.GetSkillsDescription());
     }
 

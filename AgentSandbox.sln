@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Extensions", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.Playground", "AgentSandbox.Playground\AgentSandbox.Playground.csproj", "{41F4AF15-998B-4E19-A5CC-38B1C574E187}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentSandbox.AgentPlayground", "AgentSandbox.AgentPlayground\AgentSandbox.AgentPlayground.csproj", "{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{41F4AF15-998B-4E19-A5CC-38B1C574E187}.Release|x64.Build.0 = Release|Any CPU
 		{41F4AF15-998B-4E19-A5CC-38B1C574E187}.Release|x86.ActiveCfg = Release|Any CPU
 		{41F4AF15-998B-4E19-A5CC-38B1C574E187}.Release|x86.Build.0 = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|x64.Build.0 = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Debug|x86.Build.0 = Debug|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|x64.ActiveCfg = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|x64.Build.0 = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|x86.ActiveCfg = Release|Any CPU
+		{F0B731A9-A03D-4A0E-97A8-6C487E8F069E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -340,11 +340,10 @@ public class Sandbox : IDisposable, IObservableSandbox
     {
         var sb = new StringBuilder();
         
-        sb.Append("Execute a command in a sandboxed bash terminal. ");
+        sb.Append("Run shell commands. ");
         sb.Append($"Available commands: {string.Join(", ", _shell.GetAvailableCommands())}. ");
         sb.Append("Run 'help' to list commands or '<command> -h' for detailed help on a specific command. ");
         sb.Append("Commands use short-style arguments (e.g., -l, -a, -n). ");
-        sb.Append("Use > to write output to file, >> to append.");
 
         return sb.ToString();
     }

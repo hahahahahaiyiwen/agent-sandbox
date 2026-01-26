@@ -82,6 +82,16 @@ public class SandboxShell : IShellContext
         if (string.IsNullOrWhiteSpace(commandLine))
             return ShellResult.Ok();
 
+        // Check for multi-line scripts (not supported)
+        var newlineIndex = FindUnquotedNewline(commandLine);
+        if (newlineIndex >= 0)
+        {
+            return ShellResult.Error(
+                "Multi-line scripts are not supported. Workarounds:\n" +
+                "  - Execute commands separately\n" +
+                "  - Save commands in a .sh file and run: sh <script.sh>");
+        }
+
         // Check for pipeline operator (not supported)
         var pipeIndex = FindUnquotedOperator(commandLine, "|");
         if (pipeIndex >= 0 && (pipeIndex + 1 >= commandLine.Length || commandLine[pipeIndex + 1] != '|'))
@@ -459,6 +469,44 @@ public class SandboxShell : IShellContext
             {
                 if (op == ">" && i + 1 < commandLine.Length && commandLine[i + 1] == '>')
                     continue;
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindUnquotedNewline(string commandLine)
+    {
+        var inQuote = false;
+        var quoteChar = '\0';
+        
+        for (int i = 0; i < commandLine.Length; i++)
+        {
+            var c = commandLine[i];
+
+            if (inQuote)
+            {
+                if (c == quoteChar) inQuote = false;
+                if (c == '\\' && i + 1 < commandLine.Length) i++;
+                continue;
+            }
+
+            if (c == '"' || c == '\'')
+            {
+                inQuote = true;
+                quoteChar = c;
+                continue;
+            }
+
+            if (c == '\\' && i + 1 < commandLine.Length)
+            {
+                i++;
+                continue;
+            }
+
+            if (c == '\n')
+            {
                 return i;
             }
         }
