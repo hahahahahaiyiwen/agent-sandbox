@@ -23,24 +23,6 @@ This project provides what's missing: **an in-memory sandbox where agents can re
 - **Resource Limits**: Configurable max file size, total storage, and node count
 - **Zero Dependencies**: Pure .NET implementation, no external services required
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AgentSandbox.Api                         │
-│            (REST endpoints, Swagger UI)                     │
-├─────────────────────────────────────────────────────────────┤
-│               AgentSandbox.Extensions                   │
-│         (Kernel extensions, AI function factory)            │
-├─────────────────────────────────────────────────────────────┤
-│                    AgentSandbox.Core                        │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌───────────────┐  │
-│  │ VirtualFileSystem│ │  SandboxShell   │ │SandboxManager │  │
-│  │   (in-memory)   │ │ (CLI emulator)  │ │  (sessions)   │  │
-│  └─────────────────┘ └─────────────────┘ └───────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
-
 ## Quick Start
 
 ### Run as Interactive Console (Playground)
@@ -58,6 +40,22 @@ SandboxShell > cd workspace
 SandboxShell > echo "Hello World" > hello.txt
 SandboxShell > cat hello.txt
 SandboxShell > exit
+```
+
+### Run as Interactive Chat Agent (Agent Playground)
+
+Requires an Azure OpenAI deployment.
+
+```bash
+setx AZURE_OPENAI_ENDPOINT "https://<your-resource>.openai.azure.com"
+setx AZURE_OPENAI_DEPLOYMENT "<your-deployment-name>"
+dotnet run --project AgentSandbox.AgentPlayground
+```
+
+```
+Agent > Use brainstorm skill to generate 3 app ideas for a solo NYC trip planner. Pick the best one, then use the shell tool to create /project/README.md,   /project/data/itinerary.md, and /project/plan.txt with a short outline and 2-day sample itinerary. Finally, list the project tree.
+Agent > Print out the content of /project/plan.txt.
+Agent > exit
 ```
 
 ### Run the API Server
