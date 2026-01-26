@@ -371,6 +371,11 @@ curl "http://localhost:5000/api/sandbox/agent-1/ls?path=/workspace"
 | Background jobs (`&`) | ❌ | Not applicable |
 | Command substitution | ❌ | `` `cmd` `` and `$(cmd)` not supported |
 
+**Common Commands Not Available (examples):**
+- `sed`, `awk`, `sort`, `uniq`, `cut`, `tr`, `xargs`, `tee`
+- `less`, `more`, `diff`, `chmod`, `chown`, `ln`
+- `du`, `df`, `ps`, `kill`, `whoami`, `date`, `uname`, `which`, `whereis`, `man`
+
 **Shell Script Execution:**
 
 The `sh` command executes shell scripts with support for:
