@@ -73,7 +73,7 @@ AIAgent agent = chatClient.AsAIAgent(
 AgentThread agentThread = await agent.GetNewThreadAsync();
 
 Console.WriteLine("=== AgentSandbox Agent Playground ===");
-Console.WriteLine("Type a request. Type 'exit' to quit.");
+Console.WriteLine("Telemetry monitoring enabled. Type 'exit' to quit.\n");
 
 while (true)
 {
@@ -88,6 +88,6 @@ while (true)
         break;
 
     var response = await agent.RunAsync(input, agentThread);
-    
+
     Console.WriteLine(response.Text);
 }
