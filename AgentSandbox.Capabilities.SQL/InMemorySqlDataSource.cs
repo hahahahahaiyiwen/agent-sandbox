@@ -7,6 +7,14 @@ public sealed class InMemorySqlDataSource : IDisposable
 {
     private static readonly Regex IdentifierRegex = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
     private static readonly Regex DataSourceNameRegex = new("^[A-Za-z0-9_.-]+$", RegexOptions.Compiled);
+    private static readonly HashSet<string> AllowedColumnTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "TEXT",
+        "INTEGER",
+        "REAL",
+        "BLOB",
+        "NUMERIC"
+    };
     private readonly SqliteConnection _keeperConnection;
     private readonly string _connectionString;
     private bool _disposed;
@@ -58,6 +66,7 @@ public sealed class InMemorySqlDataSource : IDisposable
         {
             ValidateIdentifier(column, "rows");
         }
+        var normalizedColumnTypes = ValidateAndNormalizeColumnTypes(options.ColumnTypes, columns);
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
@@ -65,7 +74,7 @@ public sealed class InMemorySqlDataSource : IDisposable
 
         if (options.CreateIfNotExists)
         {
-            await CreateTableIfNeededAsync(connection, transaction, table, firstRow, options, cancellationToken);
+            await CreateTableIfNeededAsync(connection, transaction, table, firstRow, normalizedColumnTypes, cancellationToken);
         }
 
         await InsertRowAsync(connection, transaction, table, columns, firstRow, cancellationToken);
@@ -95,12 +104,12 @@ public sealed class InMemorySqlDataSource : IDisposable
         SqliteTransaction transaction,
         string table,
         IReadOnlyDictionary<string, object?> firstRow,
-        InsertRowsOptions options,
+        IReadOnlyDictionary<string, string>? columnTypes,
         CancellationToken cancellationToken)
     {
         var columnDefinitions = firstRow.Select(pair =>
         {
-            var type = ResolveColumnType(pair.Key, pair.Value, options.ColumnTypes);
+            var type = ResolveColumnType(pair.Key, pair.Value, columnTypes);
             return $"{QuoteIdentifier(pair.Key)} {type}";
         });
 
@@ -151,6 +160,54 @@ public sealed class InMemorySqlDataSource : IDisposable
             float or double or decimal => "REAL",
             _ => "TEXT"
         };
+    }
+
+    private static IReadOnlyDictionary<string, string>? ValidateAndNormalizeColumnTypes(
+        IReadOnlyDictionary<string, string>? overrides,
+        IReadOnlyCollection<string> rowColumns)
+    {
+        if (overrides is null)
+        {
+            return null;
+        }
+
+        var knownColumns = new HashSet<string>(rowColumns, StringComparer.OrdinalIgnoreCase);
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var allowedTypes = string.Join(", ", AllowedColumnTypes.OrderBy(type => type, StringComparer.OrdinalIgnoreCase));
+        foreach (var pair in overrides)
+        {
+            ValidateIdentifier(pair.Key, nameof(InsertRowsOptions.ColumnTypes));
+            if (!knownColumns.Contains(pair.Key))
+            {
+                throw new ArgumentException(
+                    $"ColumnTypes override column '{pair.Key}' does not exist in row data.",
+                    nameof(InsertRowsOptions.ColumnTypes));
+            }
+
+            if (string.IsNullOrWhiteSpace(pair.Value))
+            {
+                throw new ArgumentException(
+                    $"ColumnTypes override for column '{pair.Key}' must be non-empty.",
+                    nameof(InsertRowsOptions.ColumnTypes));
+            }
+
+            var normalizedType = pair.Value.Trim().ToUpperInvariant();
+            if (!AllowedColumnTypes.Contains(normalizedType))
+            {
+                throw new ArgumentException(
+                    $"ColumnTypes override for column '{pair.Key}' has unsupported type '{pair.Value}'. Allowed types: {allowedTypes}.",
+                    nameof(InsertRowsOptions.ColumnTypes));
+            }
+
+            if (!normalized.TryAdd(pair.Key, normalizedType))
+            {
+                throw new ArgumentException(
+                    $"ColumnTypes contains duplicate column override '{pair.Key}' that differs only by casing.",
+                    nameof(InsertRowsOptions.ColumnTypes));
+            }
+        }
+
+        return normalized;
     }
 
     private static string QuoteIdentifier(string identifier) => $"\"{identifier}\"";

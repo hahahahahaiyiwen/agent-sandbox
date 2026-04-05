@@ -140,6 +140,114 @@ public class InMemorySqlDataSourceTests
         Assert.Equal("BLOB", types["payload"]);
     }
 
+    [Theory]
+    [InlineData("TEXT); DROP TABLE requests; --")]
+    [InlineData("VARCHAR(255)")]
+    [InlineData("INTEGER PRIMARY KEY")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task InsertRowsAsync_Throws_ForInvalidColumnTypeOverrides(string overrideType)
+    {
+        using var dataSource = new InMemorySqlDataSource();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await dataSource.InsertRowsAsync(
+                table: "requests",
+                rows: ToAsyncRows(new List<IReadOnlyDictionary<string, object?>>
+                {
+                    new Dictionary<string, object?> { ["result_code"] = "200", ["payload"] = "{\"ok\":true}" }
+                }),
+                options: new InsertRowsOptions
+                {
+                    CreateIfNotExists = true,
+                    ColumnTypes = new Dictionary<string, string> { ["payload"] = overrideType }
+                }));
+
+        Assert.Contains("payload", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InsertRowsAsync_Throws_WhenColumnTypeOverrideReferencesUnknownColumn()
+    {
+        using var dataSource = new InMemorySqlDataSource();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await dataSource.InsertRowsAsync(
+                table: "requests",
+                rows: ToAsyncRows(new List<IReadOnlyDictionary<string, object?>>
+                {
+                    new Dictionary<string, object?> { ["payload"] = "{\"ok\":true}" }
+                }),
+                options: new InsertRowsOptions
+                {
+                    CreateIfNotExists = true,
+                    ColumnTypes = new Dictionary<string, string> { ["missing"] = "TEXT" }
+                }));
+
+        Assert.Contains("missing", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InsertRowsAsync_Throws_WhenColumnTypeOverridesDuplicateByCase()
+    {
+        using var dataSource = new InMemorySqlDataSource();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await dataSource.InsertRowsAsync(
+                table: "requests",
+                rows: ToAsyncRows(new List<IReadOnlyDictionary<string, object?>>
+                {
+                    new Dictionary<string, object?> { ["payload"] = "{\"ok\":true}" }
+                }),
+                options: new InsertRowsOptions
+                {
+                    CreateIfNotExists = true,
+                    ColumnTypes = new Dictionary<string, string>
+                    {
+                        ["payload"] = "TEXT",
+                        ["Payload"] = "BLOB"
+                    }
+                }));
+
+        Assert.Contains("duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("TEXT", "TEXT")]
+    [InlineData("integer", "INTEGER")]
+    [InlineData(" Real ", "REAL")]
+    [InlineData("numeric", "NUMERIC")]
+    [InlineData("BLOB", "BLOB")]
+    public async Task InsertRowsAsync_AllowsSupportedColumnTypeOverrides(string overrideType, string expectedSchemaType)
+    {
+        using var dataSource = new InMemorySqlDataSource();
+        await dataSource.InsertRowsAsync(
+            table: "requests",
+            rows: ToAsyncRows(new List<IReadOnlyDictionary<string, object?>>
+            {
+                new Dictionary<string, object?> { ["payload"] = "x" }
+            }),
+            options: new InsertRowsOptions
+            {
+                CreateIfNotExists = true,
+                ColumnTypes = new Dictionary<string, string> { ["payload"] = overrideType }
+            });
+
+        await using var connection = dataSource.CreateConnection();
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(requests)";
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var types = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        while (await reader.ReadAsync())
+        {
+            types[reader.GetString(1)] = reader.GetString(2);
+        }
+
+        Assert.Equal(expectedSchemaType, types["payload"]);
+    }
+
     [Fact]
     public async Task DataSource_Throws_WhenUsedAfterDispose()
     {
