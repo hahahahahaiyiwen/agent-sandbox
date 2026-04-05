@@ -40,6 +40,8 @@ var capability = new SqlSandboxCapability(new SqlCapabilityOptions
 });
 ```
 
+`InsertRowsOptions.ColumnTypes` accepts only SQLite affinity names: `TEXT`, `INTEGER`, `REAL`, `BLOB`, `NUMERIC`.
+
 ## Read-only policy
 
 - Allowed statement categories: `SELECT`, read-only `WITH ... SELECT` (including `AS MATERIALIZED` / `AS NOT MATERIALIZED` CTE modifiers), read `EXPLAIN`, read `PRAGMA`
