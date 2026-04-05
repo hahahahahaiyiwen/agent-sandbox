@@ -189,8 +189,7 @@ public sealed class SqlSandboxCapability : ISandboxCapability, ISqlCapability, I
         => ex.SqliteErrorCode == 1 && ex.Message.Contains("syntax", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTimeout(SqliteException ex)
-        => ex.SqliteErrorCode == 9 ||
-           ex.Message.Contains("interrupted", StringComparison.OrdinalIgnoreCase);
+        => ex.SqliteErrorCode == 9;
 
     private void EnsureReadOnlyStatement(string statement)
     {

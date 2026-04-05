@@ -208,6 +208,53 @@ public class SqlCapabilityTests
         }
     }
 
+    [Theory]
+    [InlineData("SELECT id FROM users ORDER BY id")]
+    [InlineData("EXPLAIN QUERY PLAN SELECT id FROM users")]
+    [InlineData("PRAGMA table_info(users)")]
+    [InlineData("PRAGMA main.table_info(users)")]
+    [InlineData("WITH cte AS (SELECT id FROM users) SELECT id FROM cte ORDER BY id")]
+    public void ExecuteSql_AllowsReadOnlyPolicyMatrixStatements(string statement)
+    {
+        var dbPath = CreateDatabaseWithSampleRows();
+        try
+        {
+            using var sandbox = CreateSandbox(dbPath, out _);
+            var capability = sandbox.GetCapability<ISqlCapability>();
+
+            var result = capability.ExecuteSql(statement);
+
+            Assert.NotNull(result.Columns);
+            Assert.NotNull(result.Rows);
+        }
+        finally
+        {
+            File.Delete(dbPath);
+        }
+    }
+
+    [Theory]
+    [InlineData("PRAGMA cache_size = 10")]
+    [InlineData("PRAGMA journal_mode(WAL)")]
+    [InlineData("ATTACH DATABASE ':memory:' AS another")]
+    [InlineData("VALUES (1)")]
+    public void ExecuteSql_BlocksNonReadOnlyPolicyMatrixStatements(string statement)
+    {
+        var dbPath = CreateDatabaseWithSampleRows();
+        try
+        {
+            using var sandbox = CreateSandbox(dbPath, out _);
+            var capability = sandbox.GetCapability<ISqlCapability>();
+            var ex = Assert.Throws<SqlCapabilityException>(() => capability.ExecuteSql(statement));
+
+            Assert.Equal(SqlCapabilityErrorCodes.AuthDenied, ex.ErrorCode);
+        }
+        finally
+        {
+            File.Delete(dbPath);
+        }
+    }
+
     [Fact]
     public void ExecuteSql_EnforcesResponseByteLimit()
     {
@@ -298,6 +345,25 @@ public class SqlCapabilityTests
     }
 
     [Fact]
+    public void ExecuteSql_DoesNotMapInterruptedWordInColumnName_ToTimeout()
+    {
+        var dbPath = CreateDatabaseWithSampleRows();
+        try
+        {
+            using var sandbox = CreateSandbox(dbPath, out _);
+            var capability = sandbox.GetCapability<ISqlCapability>();
+
+            var ex = Assert.Throws<SqlCapabilityException>(() => capability.ExecuteSql("SELECT interrupted FROM users"));
+
+            Assert.Equal(SqlCapabilityErrorCodes.BackendUnavailable, ex.ErrorCode);
+        }
+        finally
+        {
+            File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
     public void ExecuteSql_RejectsOffsetBeyondConfiguredLimit()
     {
         var dbPath = CreateDatabaseWithSampleRows();
@@ -318,6 +384,109 @@ public class SqlCapabilityTests
         }
         finally
         {
+            File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteSql_EnforcesMaxConcurrentQueries_WhileInFlightQueryIsBlocked()
+    {
+        var dbPath = CreateDatabaseWithSampleRows();
+        var firstQueryEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstQuery = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connectionFactoryCalls = 0;
+        try
+        {
+            var capability = new SqlSandboxCapability(new SqlCapabilityOptions
+            {
+                ConnectionFactory = () =>
+                {
+                    if (Interlocked.Increment(ref connectionFactoryCalls) == 1)
+                    {
+                        firstQueryEntered.TrySetResult(true);
+                        if (!SpinWait.SpinUntil(() => releaseFirstQuery.Task.IsCompleted, TimeSpan.FromSeconds(15)))
+                        {
+                            throw new TimeoutException("Timed out waiting to release first query.");
+                        }
+                    }
+
+                    return new SqliteConnection($"Data Source={dbPath};Pooling=False");
+                },
+                MaxRowsPerPage = 10,
+                MaxResponseBytes = 4096,
+                MaxConcurrentQueries = 1
+            });
+
+            using var sandbox = new Sandbox(options: new SandboxOptions { Capabilities = [capability] });
+            var sql = sandbox.GetCapability<ISqlCapability>();
+
+            var firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
+            await firstQueryEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            var secondException = Assert.Throws<SqlCapabilityException>(() => sql.ExecuteSql("SELECT id FROM users"));
+            Assert.Equal(SqlCapabilityErrorCodes.ResourceLimit, secondException.ErrorCode);
+
+            var thirdException = Assert.Throws<SqlCapabilityException>(() => sql.ExecuteSql("SELECT id FROM users"));
+            Assert.Equal(SqlCapabilityErrorCodes.ResourceLimit, thirdException.ErrorCode);
+
+            releaseFirstQuery.TrySetResult(true);
+            var firstResult = await firstQuery;
+            Assert.Equal(2, firstResult.Rows.Count);
+        }
+        finally
+        {
+            releaseFirstQuery.TrySetResult(true);
+            File.Delete(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteSql_AllowsRecovery_AfterConcurrencyLimitFailure()
+    {
+        var dbPath = CreateDatabaseWithSampleRows();
+        var firstQueryEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstQuery = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connectionFactoryCalls = 0;
+        try
+        {
+            var capability = new SqlSandboxCapability(new SqlCapabilityOptions
+            {
+                ConnectionFactory = () =>
+                {
+                    if (Interlocked.Increment(ref connectionFactoryCalls) == 1)
+                    {
+                        firstQueryEntered.TrySetResult(true);
+                        if (!SpinWait.SpinUntil(() => releaseFirstQuery.Task.IsCompleted, TimeSpan.FromSeconds(15)))
+                        {
+                            throw new TimeoutException("Timed out waiting to release first query.");
+                        }
+                    }
+
+                    return new SqliteConnection($"Data Source={dbPath};Pooling=False");
+                },
+                MaxRowsPerPage = 10,
+                MaxResponseBytes = 4096,
+                MaxConcurrentQueries = 1
+            });
+
+            using var sandbox = new Sandbox(options: new SandboxOptions { Capabilities = [capability] });
+            var sql = sandbox.GetCapability<ISqlCapability>();
+
+            var firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
+            await firstQueryEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            var saturationException = Assert.Throws<SqlCapabilityException>(() => sql.ExecuteSql("SELECT id FROM users"));
+            Assert.Equal(SqlCapabilityErrorCodes.ResourceLimit, saturationException.ErrorCode);
+
+            releaseFirstQuery.TrySetResult(true);
+            _ = await firstQuery;
+
+            var recoveredResult = sql.ExecuteSql("SELECT id FROM users ORDER BY id");
+            Assert.Equal(2, recoveredResult.Rows.Count);
+        }
+        finally
+        {
+            releaseFirstQuery.TrySetResult(true);
             File.Delete(dbPath);
         }
     }
