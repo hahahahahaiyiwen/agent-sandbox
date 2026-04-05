@@ -224,8 +224,8 @@ public class SqlCapabilityTests
 
             var result = capability.ExecuteSql(statement);
 
-            Assert.NotNull(result.Columns);
-            Assert.NotNull(result.Rows);
+            Assert.True(result.Columns.Count > 0);
+            Assert.True(result.Rows.Count > 0);
         }
         finally
         {
@@ -395,6 +395,7 @@ public class SqlCapabilityTests
         var firstQueryEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirstQuery = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var connectionFactoryCalls = 0;
+        Task<SqlQueryResult>? firstQuery = null;
         try
         {
             var capability = new SqlSandboxCapability(new SqlCapabilityOptions
@@ -420,7 +421,7 @@ public class SqlCapabilityTests
             using var sandbox = new Sandbox(options: new SandboxOptions { Capabilities = [capability] });
             var sql = sandbox.GetCapability<ISqlCapability>();
 
-            var firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
+            firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
             await firstQueryEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
             var secondException = Assert.Throws<SqlCapabilityException>(() => sql.ExecuteSql("SELECT id FROM users"));
@@ -436,6 +437,10 @@ public class SqlCapabilityTests
         finally
         {
             releaseFirstQuery.TrySetResult(true);
+            if (firstQuery is not null)
+            {
+                _ = await firstQuery;
+            }
             File.Delete(dbPath);
         }
     }
@@ -447,6 +452,7 @@ public class SqlCapabilityTests
         var firstQueryEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirstQuery = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var connectionFactoryCalls = 0;
+        Task<SqlQueryResult>? firstQuery = null;
         try
         {
             var capability = new SqlSandboxCapability(new SqlCapabilityOptions
@@ -472,7 +478,7 @@ public class SqlCapabilityTests
             using var sandbox = new Sandbox(options: new SandboxOptions { Capabilities = [capability] });
             var sql = sandbox.GetCapability<ISqlCapability>();
 
-            var firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
+            firstQuery = Task.Run(() => sql.ExecuteSql("SELECT id FROM users"));
             await firstQueryEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
             var saturationException = Assert.Throws<SqlCapabilityException>(() => sql.ExecuteSql("SELECT id FROM users"));
@@ -487,6 +493,10 @@ public class SqlCapabilityTests
         finally
         {
             releaseFirstQuery.TrySetResult(true);
+            if (firstQuery is not null)
+            {
+                _ = await firstQuery;
+            }
             File.Delete(dbPath);
         }
     }
