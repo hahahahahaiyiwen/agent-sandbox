@@ -166,13 +166,14 @@ public sealed class InMemorySqlDataSource : IDisposable
         IReadOnlyDictionary<string, string>? overrides,
         IReadOnlyCollection<string> rowColumns)
     {
-        if (overrides is null || overrides.Count == 0)
+        if (overrides is null)
         {
-            return overrides;
+            return null;
         }
 
         var knownColumns = new HashSet<string>(rowColumns, StringComparer.OrdinalIgnoreCase);
         var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var allowedTypes = string.Join(", ", AllowedColumnTypes.OrderBy(type => type, StringComparer.OrdinalIgnoreCase));
         foreach (var pair in overrides)
         {
             ValidateIdentifier(pair.Key, nameof(InsertRowsOptions.ColumnTypes));
@@ -194,11 +195,16 @@ public sealed class InMemorySqlDataSource : IDisposable
             if (!AllowedColumnTypes.Contains(normalizedType))
             {
                 throw new ArgumentException(
-                    $"ColumnTypes override for column '{pair.Key}' has unsupported type '{pair.Value}'. Allowed types: TEXT, INTEGER, REAL, BLOB, NUMERIC.",
+                    $"ColumnTypes override for column '{pair.Key}' has unsupported type '{pair.Value}'. Allowed types: {allowedTypes}.",
                     nameof(InsertRowsOptions.ColumnTypes));
             }
 
-            normalized[pair.Key] = normalizedType;
+            if (!normalized.TryAdd(pair.Key, normalizedType))
+            {
+                throw new ArgumentException(
+                    $"ColumnTypes contains duplicate column override '{pair.Key}' that differs only by casing.",
+                    nameof(InsertRowsOptions.ColumnTypes));
+            }
         }
 
         return normalized;

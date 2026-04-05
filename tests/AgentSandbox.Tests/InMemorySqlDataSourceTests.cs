@@ -187,6 +187,31 @@ public class InMemorySqlDataSourceTests
         Assert.Contains("missing", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task InsertRowsAsync_Throws_WhenColumnTypeOverridesDuplicateByCase()
+    {
+        using var dataSource = new InMemorySqlDataSource();
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await dataSource.InsertRowsAsync(
+                table: "requests",
+                rows: ToAsyncRows(new List<IReadOnlyDictionary<string, object?>>
+                {
+                    new Dictionary<string, object?> { ["payload"] = "{\"ok\":true}" }
+                }),
+                options: new InsertRowsOptions
+                {
+                    CreateIfNotExists = true,
+                    ColumnTypes = new Dictionary<string, string>
+                    {
+                        ["payload"] = "TEXT",
+                        ["Payload"] = "BLOB"
+                    }
+                }));
+
+        Assert.Contains("duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData("TEXT", "TEXT")]
     [InlineData("integer", "INTEGER")]
